@@ -24,7 +24,7 @@ import NewsEvents from './components/news-events/NewsEvents';
 
 import './styles/globals.css';
 
-function AppLayout() {
+function App() {
   const location = useLocation();
   const noLayoutRoutes = ['/login', '/register', '/forgot-password', '/complete-profile'];
   const hideLayout = noLayoutRoutes.includes(location.pathname);
@@ -99,7 +99,11 @@ function AppLayout() {
                 </ProtectedRoute>
               }
             />
-            <Route path="*" element={<Navigate to="/dashboard" />} />
+
+            {/* 🔁 Updated fallback and default redirects */}
+            <Route index element={<Navigate to="/login" />} />
+            <Route path="/" element={<Navigate to="/login" />} />
+            <Route path="*" element={<Navigate to="/login" />} />
           </Routes>
         </main>
 
@@ -109,4 +113,4 @@ function AppLayout() {
   );
 }
 
-export default AppLayout;
+export default App;
