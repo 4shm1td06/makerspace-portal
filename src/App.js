@@ -100,7 +100,7 @@ function App() {
               }
             />
 
-            {/* 🔁 Updated fallback and default redirects */}
+            {/* ✅ Correct default and wildcard redirects */}
             <Route index element={<Navigate to="/login" />} />
             <Route path="/" element={<Navigate to="/login" />} />
             <Route path="*" element={<Navigate to="/login" />} />
