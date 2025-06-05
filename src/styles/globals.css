@@ -2,18 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Global base styling */
 @layer base {
+  :root {
+    --btn-bg-color: #3b82f6; /* Blue - light mode */
+  }
+  .dark {
+    --btn-bg-color: #dc2626; /* Red - dark mode */
+  }
+
   body {
-    @apply font-sans text-gray-800 bg-gray-50;
+    @apply font-sans text-gray-800 bg-gray-50 dark:bg-black dark:text-white;
     font-family: 'Inter', sans-serif;
   }
 
+  /* Keep headings and text color unchanged */
   h1, h2, h3, h4, h5 {
-    @apply font-semibold text-gray-900;
+    @apply font-semibold text-gray-900 dark:text-white;
   }
 
   a {
-    @apply text-blue-600 hover:underline;
+    @apply text-blue-600 hover:underline dark:text-blue-400; /* or adjust */
   }
 }

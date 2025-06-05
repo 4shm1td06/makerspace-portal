@@ -1,227 +1,196 @@
-import React, { useState, useEffect } from "react";
-import { supabase } from "../../services/supabase";
-import toast from "react-hot-toast";
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../../services/supabase';
+import { useNavigate } from 'react-router-dom';
 
-function SettingsPage() {
+const SettingsPage = () => {
   const [profile, setProfile] = useState(null);
-  const [userId, setUserId] = useState("");
-  const [userEmail, setUserEmail] = useState("");
-  const [name, setName] = useState("");
-  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    localStorage.setItem('theme', newMode ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', newMode);
+  };
 
   const fetchProfile = async () => {
     const {
       data: { user },
-      error: userError,
+      error,
     } = await supabase.auth.getUser();
 
-    if (userError || !user) return;
+    if (error || !user) {
+      navigate('/login');
+      return;
+    }
 
-    setUserId(user.id);
-    setUserEmail(user.email);
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
+    const { data, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
       .single();
 
-    if (data) {
-      setProfile(data);
-      setName(data.name || "");
+    if (profileError) {
+      console.error(profileError.message);
     } else {
-      toast.error("Error fetching profile");
+      setProfile(data);
     }
+
+    setLoading(false);
   };
 
   useEffect(() => {
     fetchProfile();
   }, []);
 
-  const handleSave = async () => {
+  const handlePasswordReset = async () => {
+    setError('');
+    setSuccess('');
+
+    if (newPassword !== confirmPassword) {
+      setError("New passwords don't match.");
+      return;
+    }
+
     const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const userEmail = session?.user?.email;
 
-    if (authError || !user) {
-      toast.error("User not authenticated.");
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: userEmail,
+      password: currentPassword,
+    });
+
+    if (signInError) {
+      setError('Current password is incorrect.');
       return;
     }
 
-    const { data: existing, error: fetchError } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", user.id)
-      .single();
-
-    const updateData = {
-      id: user.id,
-      name,
-      address: "address", // required by schema
-    };
-
-    let response;
-    if (existing) {
-      response = await supabase
-        .from("profiles")
-        .update(updateData)
-        .eq("id", user.id);
-    } else {
-      response = await supabase.from("profiles").insert(updateData);
-    }
-
-    const { error } = response;
-
-    if (error) {
-      toast.error("Failed to save changes.");
-      console.error("Supabase error:", error);
-    } else {
-      toast.success("Settings saved.");
-      fetchProfile();
-    }
-  };
-
-  const handleAvatarUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file || !userId) return;
-
-    const maxSize = 2 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast.error("File is too large. Max size is 2MB.");
-      return;
-    }
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Invalid file type. Only JPG, PNG, or WEBP allowed.");
-      return;
-    }
-
-    const fileExt = file.name.split(".").pop();
-    const filePath = `${userId}.${fileExt}`;
-
-    setUploading(true);
-
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(filePath, file, {
-        upsert: true,
-        contentType: file.type,
-      });
-
-    if (uploadError) {
-      toast.error("Upload failed!");
-      setUploading(false);
-      return;
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from("avatars")
-      .getPublicUrl(filePath);
-
-    const publicUrl = publicUrlData?.publicUrl;
-    if (!publicUrl) {
-      toast.error("Could not get public URL.");
-      setUploading(false);
-      return;
-    }
-
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ avatar_url: publicUrl })
-      .eq("id", userId);
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
 
     if (updateError) {
-      toast.error("Failed to update avatar.");
+      setError(updateError.message);
     } else {
-      toast.success("Avatar updated!");
-      fetchProfile();
-    }
-
-    setUploading(false);
-  };
-
-  const handleResetPassword = async () => {
-    if (!userEmail) {
-      toast.error("Email not found.");
-      return;
-    }
-    const { error } = await supabase.auth.resetPasswordForEmail(userEmail);
-    if (error) {
-      toast.error("Failed to send reset email.");
-    } else {
-      toast.success("Password reset email sent!");
+      setSuccess('Password updated successfully!');
+      setShowModal(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     }
   };
 
-  if (!profile) {
-    return (
-      <div className="text-center py-20 text-gray-500">
-        Loading profile...
-      </div>
-    );
-  }
+  if (loading || !profile) return <div className="p-4">Loading...</div>;
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-md mt-6">
-      <h2 className="text-xl font-semibold mb-4 text-gray-900">Account Settings</h2>
-
-      <div className="flex flex-col items-center space-y-4">
-        <img
-          src={profile?.avatar_url || "https://placehold.co/96x96"}
-          alt="Avatar"
-          className="w-24 h-24 rounded-full object-cover border"
-        />
-        <label className="text-sm font-medium text-gray-700">Change Avatar</label>
-        <input type="file" accept="image/*" onChange={handleAvatarUpload} />
-        {uploading && <p className="text-xs text-gray-500">Uploading...</p>}
+    <div className="p-6 max-w-3xl mx-auto bg-white dark:bg-black text-gray-900 dark:text-white min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-semibold">Settings</h1>
+        <button
+          onClick={toggleDarkMode}
+          className="bg-secondary dark:bg-white text-white dark:text-black px-4 py-2 rounded shadow"
+        >
+          {isDarkMode ? '☀ Light Mode' : '🌙 Dark Mode'}
+        </button>
       </div>
 
-      <div className="mt-6 space-y-4">
+      <div className="bg-white dark:bg-gray-900 border p-6 rounded-lg shadow space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1 text-gray-800">Name</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Email
+          </label>
           <input
             type="text"
-            className="w-full border rounded px-3 py-2 text-gray-900 bg-white"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={profile.email}
+            disabled
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100 dark:bg-gray-800 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Role
+          </label>
+          <input
+            type="text"
+            value={profile.role || 'member'}
+            disabled
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100 dark:bg-gray-800 dark:text-white"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1 text-gray-800">Role</label>
-          <p className="w-full border rounded px-3 py-2 text-gray-900 bg-white">
-            {profile.role || "member"}
-          </p>
-        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="mt-4 bg-blue-600 hover:bg-blue-700 dark:bg-red-600 dark:hover:bg-red-700 text-white px-4 py-2 rounded"
+        >
+          Reset Password
+        </button>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleResetPassword}
-            className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700"
-          >
-            Reset Password
-          </button>
-        </div>
-
-        <div className="pt-4 flex gap-2">
-          <button
-            onClick={handleSave}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Save Changes
-          </button>
-          <button
-            onClick={fetchProfile}
-            className="border border-gray-300 px-4 py-2 rounded hover:bg-gray-100 text-gray-800"
-          >
-            Cancel
-          </button>
-        </div>
+        {success && <p className="text-green-600 dark:text-green-400">{success}</p>}
+        {error && <p className="text-red-600 dark:text-red-400">{error}</p>}
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg w-full max-w-md text-gray-900 dark:text-white">
+            <h2 className="text-xl font-semibold mb-4">Reset Password</h2>
+
+            <div className="space-y-4">
+              <input
+                type="password"
+                placeholder="Current Password"
+                className="w-full border px-3 py-2 rounded bg-gray-100 dark:bg-gray-800 dark:text-white"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+              <input
+                type="password"
+                placeholder="New Password"
+                className="w-full border px-3 py-2 rounded bg-gray-100 dark:bg-gray-800 dark:text-white"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <input
+                type="password"
+                placeholder="Confirm New Password"
+                className="w-full border px-3 py-2 rounded bg-gray-100 dark:bg-gray-800 dark:text-white"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-4">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 border rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePasswordReset}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-red-600 dark:hover:bg-red-700 text-white rounded"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
 
 export default SettingsPage;

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase';
 import ProjectCard from './modal/ProjectCard';
 import ProjectModal from './modal/ProjectModal';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const MyProjects = () => {
   const [projects, setProjects] = useState([]);
@@ -20,14 +22,12 @@ const MyProjects = () => {
   }, []);
 
   useEffect(() => {
-    setCurrentPage(1); // Reset to first page when filter changes
+    setCurrentPage(1);
   }, [filterStatus]);
 
   const fetchProjects = async () => {
     setLoading(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
       console.error('User not authenticated');
@@ -54,10 +54,7 @@ const MyProjects = () => {
     e.preventDefault();
     setSubmitting(true);
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
       console.error('User not authenticated:', userError);
@@ -101,11 +98,11 @@ const MyProjects = () => {
   const handleDelete = async (id) => {
     const confirmed = window.confirm('Are you sure you want to delete this project?');
     if (confirmed) {
-      setProjects((prev) => prev.filter((p) => p.id !== id)); // Optimistic UI
+      setProjects((prev) => prev.filter((p) => p.id !== id));
       const { error } = await supabase.from('projects').delete().eq('id', id);
       if (error) {
         console.error(error);
-        fetchProjects(); // Recover on error
+        fetchProjects();
       }
     }
   };
@@ -117,12 +114,8 @@ const MyProjects = () => {
       return;
     }
 
-    const escapeCSV = (value) => {
-      if (typeof value === 'string') {
-        return `"${value.replace(/"/g, '""')}"`;
-      }
-      return value;
-    };
+    const escapeCSV = (value) =>
+      typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value;
 
     const csv = [
       Object.keys(csvData[0]).join(','),
@@ -138,6 +131,34 @@ const MyProjects = () => {
     window.URL.revokeObjectURL(url);
   };
 
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.text('My Projects', 14, 16);
+
+    if (filteredProjects.length === 0) {
+      alert('No projects to export.');
+      return;
+    }
+
+    const tableData = filteredProjects.map((project, index) => [
+      index + 1,
+      project.title,
+      project.description || 'No description',
+      project.status,
+      new Date(project.created_at).toLocaleDateString(),
+    ]);
+
+    doc.autoTable({
+      head: [['#', 'Title', 'Description', 'Status', 'Created At']],
+      body: tableData,
+      startY: 20,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [0, 123, 255] },
+    });
+
+    doc.save('my-projects.pdf');
+  };
+
   const filteredProjects = filterStatus
     ? projects.filter((p) => p.status === filterStatus)
     : projects;
@@ -149,47 +170,57 @@ const MyProjects = () => {
   );
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">My Projects</h2>
-        <button
-          onClick={() => {
-            setShowModal(true);
-            setIsEditing(false);
-            setNewProject({ title: '', description: '', status: 'planning' });
-          }}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Add Project
-        </button>
+    <section className="dark:text-white">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold">My Projects</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setShowModal(true);
+              setIsEditing(false);
+              setNewProject({ title: '', description: '', status: 'planning' });
+            }}
+            className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-xl shadow hover:bg-blue-700 dark:hover:bg-blue-600"
+          >
+            + Add Project
+          </button>
+          <button
+            onClick={exportCSV}
+            className="bg-green-600 dark:bg-green-500 text-white px-4 py-2 rounded-xl shadow hover:bg-green-700 dark:hover:bg-green-600"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={exportPDF}
+            className="bg-red-600 dark:bg-red-500 text-white px-4 py-2 rounded-xl shadow hover:bg-red-700 dark:hover:bg-red-600"
+          >
+            Export PDF
+          </button>
+        </div>
       </div>
 
-      <div className="mb-4 flex gap-2">
+      <div className="flex flex-wrap gap-2 mb-4">
         {['planning', 'active', 'completed'].map((status) => (
           <button
             key={status}
             onClick={() => setFilterStatus(filterStatus === status ? '' : status)}
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
+            className={`px-4 py-2 rounded-full text-sm font-medium border transition ${
               filterStatus === status
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                ? 'bg-blue-600 text-white border-blue-600 dark:bg-blue-500 dark:border-blue-500'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700'
             }`}
           >
             {status.charAt(0).toUpperCase() + status.slice(1)}
           </button>
         ))}
-        <button
-          onClick={exportCSV}
-          className="ml-auto bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-        >
-          Export CSV
-        </button>
       </div>
 
       {loading ? (
-        <p className="text-center text-gray-500">Loading projects...</p>
+        <p className="text-center text-gray-500 dark:text-gray-400">Loading projects...</p>
+      ) : filteredProjects.length === 0 ? (
+        <p className="text-center text-gray-500 dark:text-gray-400 italic">No projects found for this status.</p>
       ) : (
-        <ul className="space-y-3">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {paginatedProjects.map((project) => (
             <ProjectCard
               key={project.id}
@@ -203,27 +234,27 @@ const MyProjects = () => {
               onDelete={handleDelete}
             />
           ))}
-        </ul>
+        </div>
       )}
 
-      {!loading && (
-        <div className="mt-4 flex justify-between items-center">
+      {!loading && totalPages > 1 && (
+        <div className="mt-6 flex justify-center gap-4 text-sm">
           <button
             disabled={currentPage === 1}
             onClick={() => setCurrentPage((prev) => prev - 1)}
-            className="px-3 py-1 rounded border disabled:opacity-50"
+            className="px-4 py-2 rounded border bg-white hover:bg-gray-100 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:bg-gray-700"
           >
-            Previous
+            ← Previous
           </button>
-          <span className="text-sm text-gray-700">
-            Page {currentPage} of {totalPages || 1}
+          <span className="text-gray-600 dark:text-gray-300">
+            Page {currentPage} of {totalPages}
           </span>
           <button
-            disabled={currentPage === totalPages || totalPages === 0}
+            disabled={currentPage === totalPages}
             onClick={() => setCurrentPage((prev) => prev + 1)}
-            className="px-3 py-1 rounded border disabled:opacity-50"
+            className="px-4 py-2 rounded border bg-white hover:bg-gray-100 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:bg-gray-700"
           >
-            Next
+            Next →
           </button>
         </div>
       )}
@@ -242,7 +273,7 @@ const MyProjects = () => {
         }}
         onSubmit={handleSubmit}
       />
-    </div>
+    </section>
   );
 };
 

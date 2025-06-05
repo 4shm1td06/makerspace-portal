@@ -29,17 +29,19 @@ const PersonalInfo = () => {
   }, []);
 
   if (!profile) {
-    return <div>Loading...</div>;
+    return <div className="text-gray-700 dark:text-gray-300">Loading...</div>;
   }
 
   return (
-    <div className="bg-white p-4 rounded shadow-md">
-      <h2 className="text-xl font-semibold mb-2">Personal Information</h2>
-      <p><strong>Name:</strong> {profile.name}</p>
-      <p><strong>Email:</strong> {profile.email}</p>
-      <p><strong>Phone:</strong> {profile.mobile_no}</p>
-      <p><strong>Address:</strong> {profile.address}</p>
-      <p><strong>Role:</strong> {profile.role}</p>
+    <div className="bg-white dark:bg-gray-800 p-4 rounded shadow-md dark:shadow-black/40">
+      <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-100">
+        Personal Information
+      </h2>
+      <p className="text-gray-700 dark:text-gray-300"><strong>Name:</strong> {profile.name}</p>
+      <p className="text-gray-700 dark:text-gray-300"><strong>Email:</strong> {profile.email}</p>
+      <p className="text-gray-700 dark:text-gray-300"><strong>Phone:</strong> {profile.mobile_no}</p>
+      <p className="text-gray-700 dark:text-gray-300"><strong>Address:</strong> {profile.address}</p>
+      <p className="text-gray-700 dark:text-gray-300"><strong>Role:</strong> {profile.role}</p>
     </div>
   );
 };

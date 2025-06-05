@@ -12,7 +12,7 @@ const EmergencyInfo = () => {
       if (!user) return;
 
       const { data, error } = await supabase
-        .from('emergency_contact_info') // No quotes needed since there are no spaces
+      .from('emergency_contact_info') // No quotes needed since there are no spaces
         .select('*')
         .eq('id', user.id)
         .single();
@@ -37,9 +37,10 @@ const EmergencyInfo = () => {
       {emergency ? (
         <>
           <p><strong>Name:</strong> {emergency.name}</p>
-          <p><strong>Phone:</strong> {emergency.phone}</p>
+          <p><strong>Phone:</strong> {emergency.emergency_contact}</p>
           <p><strong>Address:</strong> {emergency.address}</p>
           <p><strong>Relation:</strong> {emergency.relation}</p>
+          <p><strong>Blood Type:</strong> {emergency.blood_type}</p>
         </>
       ) : (
         <p>No emergency contact info found.</p>

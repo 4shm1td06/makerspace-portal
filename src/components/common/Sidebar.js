@@ -1,5 +1,3 @@
-// src/components/common/Sidebar.js
-
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -10,7 +8,7 @@ import clsx from 'clsx';
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: <Home /> },
   { name: 'Projects', path: '/projects', icon: <ClipboardList /> },
-  { name: 'Inventory', path: '/inventory', icon: <Boxes />,  },
+  { name: 'Inventory', path: '/inventory', icon: <Boxes /> },
   { name: 'Events', path: '/news-events', icon: <Calendar /> },
   { name: 'Members', path: '/members', icon: <Users />, roles: ['admin'] },
   { name: 'Settings', path: '/settings', icon: <Settings /> },
@@ -38,7 +36,7 @@ export default function Sidebar({ isOpen, onClose, collapsed }) {
 
       <aside
         className={clsx(
-          'fixed z-50 top-0 left-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-200 ease-in-out',
+          'fixed z-50 top-0 left-0 h-full w-64 bg-white dark:bg-gray-900 shadow-lg dark:shadow-black/50 transform transition-transform duration-200 ease-in-out',
           {
             'translate-x-0': isOpen,
             '-translate-x-full': !isOpen,
@@ -47,10 +45,13 @@ export default function Sidebar({ isOpen, onClose, collapsed }) {
         )}
       >
         {/* Mobile close button */}
-        <div className="flex items-center justify-between p-4 border-b lg:hidden">
-          <h1 className="text-xl font-bold text-primary-700">Makerspace ERP</h1>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 lg:hidden">
+          {/* Changed dark:text-primary-400 (blue) to dark:text-red-400 */}
+          <h1 className="text-xl font-bold text-primary-700 dark:text-red-400">
+            Makerspace ERP
+          </h1>
           <button onClick={onClose}>
-            <X className="h-5 w-5 text-gray-700" />
+            <X className="h-5 w-5 text-gray-700 dark:text-gray-300" />
           </button>
         </div>
 
@@ -64,8 +65,8 @@ export default function Sidebar({ isOpen, onClose, collapsed }) {
               className={clsx(
                 'flex items-center gap-3 px-3 py-2 rounded-lg transition-all',
                 isActive(item.path)
-                  ? 'bg-primary-600 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-primary-600 text-white dark:bg-red-600 dark:text-white'
+                  : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
               )}
             >
               {item.icon}
@@ -75,10 +76,10 @@ export default function Sidebar({ isOpen, onClose, collapsed }) {
         </nav>
 
         {/* Logout */}
-        <div className="absolute bottom-0 left-0 w-full p-4 border-t">
+        <div className="absolute bottom-0 left-0 w-full p-4 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={signOut}
-            className="w-full flex items-center gap-3 text-red-600 hover:text-red-800"
+            className="w-full flex items-center gap-3 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-600"
           >
             <LogOut className="h-5 w-5" />
             Logout
