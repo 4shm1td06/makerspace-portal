@@ -2,7 +2,7 @@ import React from 'react';
 
 const ProjectCard = ({ project, onEdit, onDelete }) => {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow p-6 border border-gray-100 dark:border-gray-700 transition hover:shadow-md">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-6 border border-gray-100 dark:border-gray-700 transition hover:shadow-md">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white">{project.title}</h3>
         <span

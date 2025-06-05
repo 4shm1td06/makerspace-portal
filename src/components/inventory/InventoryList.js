@@ -3,7 +3,7 @@ import { supabase } from '../../services/supabase';
 import * as XLSX from 'xlsx';
 
 const InventoryList = () => {
-  const [items, setItems] = useState([]);
+  const [rawItems, setRawItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -18,16 +18,56 @@ const InventoryList = () => {
         .order('created_at', { ascending: false });
 
       if (error) console.error('Error fetching inventory:', error);
-      setItems(data || []);
+      setRawItems(data || []);
       setLoading(false);
     };
 
     fetchInventory();
+
+    const subscription = supabase
+      .channel('inventory-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'inventory' },
+        () => fetchInventory()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
-  const uniqueCategories = [...new Set(items.map(item => item.category))];
+  const groupItems = (items) => {
+    const grouped = {};
 
-  const filteredItems = items.filter(item => {
+    items.forEach(item => {
+      const key = `${item.item_name}-${item.category}-${item.unit}`;
+      if (!grouped[key]) {
+        grouped[key] = { ...item };
+      } else {
+        grouped[key].quantity += item.quantity;
+      }
+    });
+
+    // Add status based on quantity
+    Object.values(grouped).forEach(item => {
+      if (item.quantity === 0) {
+        item.status = 'Out of Stock';
+      } else if (item.quantity <= 5) {
+        item.status = 'Low Stock';
+      } else {
+        item.status = 'Available';
+      }
+    });
+
+    return Object.values(grouped);
+  };
+
+  const groupedItems = groupItems(rawItems);
+  const uniqueCategories = [...new Set(groupedItems.map(item => item.category))];
+
+  const filteredItems = groupedItems.filter(item => {
     const matchesSearch = `${item.item_name} ${item.category}`.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory ? item.category === selectedCategory : true;
     return matchesSearch && matchesCategory;
@@ -37,7 +77,7 @@ const InventoryList = () => {
   const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   useEffect(() => {
-    setCurrentPage(1); // Reset page when filters change
+    setCurrentPage(1);
   }, [searchQuery, selectedCategory]);
 
   const handlePrev = () => {
@@ -116,12 +156,12 @@ const InventoryList = () => {
             placeholder="Search by name or category"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-gray-300 dark:bg-gray-950 rounded-md px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-gray-300 dark:bg-gray-950 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Categories</option>
             {uniqueCategories.map(cat => (
@@ -144,20 +184,20 @@ const InventoryList = () => {
       ) : (
         <>
           <table className="min-w-full divide-y divide-gray-200 border rounded-lg overflow-hidden">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 dark:bg-gray-950">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Name</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Category</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Quantity</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-white">Name</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-white">Category</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-white">Quantity</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-white">Status</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
+            <tbody className="bg-white dark:bg-gray-800 text-gray-700 dark:text-white divide-y divide-gray-300">
               {paginatedItems.map(item => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.item_name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{item.category}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{item.quantity} {item.unit}</td>
+                <tr key={`${item.item_name}-${item.category}-${item.unit}`} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  <td className="px-4 py-3 text-sm">{item.item_name}</td>
+                  <td className="px-4 py-3 text-sm">{item.category}</td>
+                  <td className="px-4 py-3 text-sm">{item.quantity} {item.unit}</td>
                   <td className="px-4 py-3">
                     <span className={getStatusBadge(item.status)}>{item.status}</span>
                   </td>

@@ -83,7 +83,7 @@ const Header = ({ onSidebarToggle, darkMode, setDarkMode }) => {
           </button>
 
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg dark:bg-red-500 flex items-center justify-center">
               <span className="text-white font-bold text-sm">MS</span>
             </div>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">
@@ -151,7 +151,7 @@ const Header = ({ onSidebarToggle, darkMode, setDarkMode }) => {
                   </div>
 
                   <button
-                    onClick={() => navigate('/profile')}
+                    onClick={() => navigate('/dashboard')}
                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
                     <User className="h-4 w-4 mr-3" />
@@ -188,7 +188,7 @@ const Header = ({ onSidebarToggle, darkMode, setDarkMode }) => {
 
                   <button
                     onClick={handleSignOut}
-                    className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 dark:hover:bg-red-900 dark:text-red-400"
+                    className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 dark:hover:bg-red-950 dark:text-red-400"
                   >
                     <LogOut className="h-4 w-4 mr-3" />
                     Sign Out

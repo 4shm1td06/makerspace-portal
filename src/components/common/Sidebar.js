@@ -4,6 +4,8 @@ import {
   Home, ClipboardList, Boxes, Calendar, Users, Settings, LogOut, X,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { supabase } from '../../services/supabase';
+import { useNavigate } from 'react-router-dom';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: <Home /> },
@@ -18,11 +20,21 @@ export default function Sidebar({ isOpen, onClose, collapsed }) {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const userRole = user?.user_metadata?.role || 'member';
-
+  const navigate = useNavigate();
   const isActive = (path) => location.pathname.startsWith(path);
   const filteredItems = navItems.filter(
     (item) => !item.roles || item.roles.includes(userRole)
   );
+
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   return (
     <>
@@ -78,7 +90,7 @@ export default function Sidebar({ isOpen, onClose, collapsed }) {
         {/* Logout */}
         <div className="absolute bottom-0 left-0 w-full p-4 border-t border-gray-200 dark:border-gray-700">
           <button
-            onClick={signOut}
+            onClick={handleSignOut}
             className="w-full flex items-center gap-3 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-600"
           >
             <LogOut className="h-5 w-5" />

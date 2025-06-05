@@ -7,16 +7,6 @@ import BillSubmission from './BillSubmission';
 const InventoryMain = () => {
   const [darkMode, setDarkMode] = useState(false);
 
-  // Toggle 'dark' class on <html> element
-  useEffect(() => {
-    const html = document.documentElement;
-    if (darkMode) {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
-  }, [darkMode]);
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6 transition-colors duration-300">
       <div className="max-w-5xl mx-auto space-y-6">

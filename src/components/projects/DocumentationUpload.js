@@ -41,7 +41,7 @@ const DocumentationUpload = () => {
   };
 
   return (
-    <div className="card max-w-md mx-auto mt-6 p-6 bg-white dark:bg-gray-900 rounded-xl shadow border border-gray-200 dark:border-gray-700">
+    <div className="card max-w-md mx-auto mt-6 p-6 bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700">
       <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
         Add Documentation URL
       </h2>

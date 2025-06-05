@@ -3,7 +3,7 @@ import { supabase } from '../../services/supabase';
 import ProjectCard from './modal/ProjectCard';
 import ProjectModal from './modal/ProjectModal';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const MyProjects = () => {
   const [projects, setProjects] = useState([]);
@@ -142,14 +142,16 @@ const MyProjects = () => {
 
     const tableData = filteredProjects.map((project, index) => [
       index + 1,
+      project.owner_id,
       project.title,
       project.description || 'No description',
       project.status,
       new Date(project.created_at).toLocaleDateString(),
+      new Date(project.deadline).toLocaleDateString(),
     ]);
 
     doc.autoTable({
-      head: [['#', 'Title', 'Description', 'Status', 'Created At']],
+      head: [['#', 'Owner ID', 'Title', 'Description', 'Status', 'Created At', 'Deadline']],
       body: tableData,
       startY: 20,
       styles: { fontSize: 10 },

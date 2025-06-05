@@ -13,6 +13,7 @@ const SettingsPage = () => {
   const [success, setSuccess] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
@@ -157,19 +158,26 @@ const SettingsPage = () => {
                 onChange={(e) => setCurrentPassword(e.target.value)}
               />
               <input
-                type="password"
+                id ="new-password"
+                type={showPassword ? "text" : "password"}
                 placeholder="New Password"
                 className="w-full border px-3 py-2 rounded bg-gray-100 dark:bg-gray-800 dark:text-white"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
               <input
-                type="password"
+                id="confirm-password"
+                type={showPassword ? "text" : "password"}
                 placeholder="Confirm New Password"
                 className="w-full border px-3 py-2 rounded bg-gray-100 dark:bg-gray-800 dark:text-white"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="text-sm text-gray-500 dark:text-gray-400 hover:underline">{showPassword ? "Hide" : "Show"}
+                </button>
             </div>
 
             <div className="mt-6 flex justify-end space-x-4">

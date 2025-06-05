@@ -55,7 +55,7 @@ function App() {
   // For simplicity, pass as prop here or use context in bigger apps
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-black overflow-hidden">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-800 overflow-hidden">
       {!hideLayout && (
         <Sidebar
           isOpen={isSidebarOpen}

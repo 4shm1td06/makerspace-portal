@@ -31,8 +31,8 @@ const EventsList = () => {
   }, []);
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200">
-      <h2 className="text-xl font-semibold mb-4 text-gray-800">Upcoming Events</h2>
+    <div className="bg-white dark:bg-gray-950 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+      <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Upcoming Events</h2>
 
       {loading && <p className="text-gray-500 italic">Loading events...</p>}
       {error && <p className="text-red-500">Error: {error}</p>}
