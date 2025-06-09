@@ -6,6 +6,7 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
@@ -25,6 +26,8 @@ import SettingsPage from './components/common/SettingsPage';
 
 import './styles/globals.css';
 
+import { NotificationProvider } from './context/NotificationContext';
+
 function App() {
   const location = useLocation();
   const noLayoutRoutes = ['/login', '/register', '/forgot-password', '/complete-profile'];
@@ -33,11 +36,9 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
-    // Initialize from localStorage or default to false
     return localStorage.getItem('darkMode') === 'true';
   });
 
-  // Apply dark class to html element on darkMode change
   useEffect(() => {
     const html = document.documentElement;
     if (darkMode) {
@@ -51,94 +52,92 @@ function App() {
   const handleSidebarToggle = () => setIsSidebarOpen(!isSidebarOpen);
   const handleCollapseToggle = () => setCollapsed(!collapsed);
 
-  // Expose darkMode toggle so SettingsPage can control it (via props or context)
-  // For simplicity, pass as prop here or use context in bigger apps
-
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-800 overflow-hidden">
-      {!hideLayout && (
-        <Sidebar
-          isOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
-          collapsed={collapsed}
-          darkMode={darkMode}
-        />
-      )}
-
-      <div className="flex flex-col flex-1">
+    <NotificationProvider>
+      <div className="flex h-screen bg-gray-100 dark:bg-gray-800 overflow-hidden">
         {!hideLayout && (
-          <Header
-            onSidebarToggle={handleSidebarToggle}
+          <Sidebar
+            isOpen={isSidebarOpen}
+            onClose={() => setIsSidebarOpen(false)}
             collapsed={collapsed}
-            onCollapseToggle={handleCollapseToggle}
             darkMode={darkMode}
-            setDarkMode={setDarkMode} // Optionally add toggle in header too
           />
         )}
 
-        <main className="flex-1 overflow-y-auto p-4 text-gray-900 dark:text-white">
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route
-              path="/complete-profile"
-              element={
-                <ProtectedRoute>
-                  <CompleteProfile />
-                </ProtectedRoute>
-              }
+        <div className="flex flex-col flex-1">
+          {!hideLayout && (
+            <Header
+              onSidebarToggle={handleSidebarToggle}
+              collapsed={collapsed}
+              onCollapseToggle={handleCollapseToggle}
+              darkMode={darkMode}
+              setDarkMode={setDarkMode}
             />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/projects"
-              element={
-                <ProtectedRoute>
-                  <ProjectsMain />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/inventory"
-              element={
-                <ProtectedRoute>
-                  <InventoryMain />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/news-events"
-              element={
-                <ProtectedRoute>
-                  <NewsEvents />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <SettingsPage darkMode={darkMode} setDarkMode={setDarkMode} />
-                </ProtectedRoute>
-              }
-            />
+          )}
 
-            <Route index element={<Navigate to="/login" />} />
-            <Route path="/" element={<Navigate to="/login" />} />
-            <Route path="*" element={<Navigate to="/login" />} />
-          </Routes>
-        </main>
+          <main className="flex-1 overflow-y-auto p-4 text-gray-900 dark:text-white">
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route
+                path="/complete-profile"
+                element={
+                  <ProtectedRoute>
+                    <CompleteProfile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/projects"
+                element={
+                  <ProtectedRoute>
+                    <ProjectsMain />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/inventory"
+                element={
+                  <ProtectedRoute>
+                    <InventoryMain />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/news-events"
+                element={
+                  <ProtectedRoute>
+                    <NewsEvents />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <SettingsPage darkMode={darkMode} setDarkMode={setDarkMode} />
+                  </ProtectedRoute>
+                }
+              />
+              <Route index element={<Navigate to="/login" />} />
+              <Route path="/" element={<Navigate to="/login" />} />
+              <Route path="*" element={<Navigate to="/login" />} />
+            </Routes>
+          </main>
 
-        <ToastContainer position="top-right" />
+          <ToastContainer position="top-right" autoClose={3000} />
+        </div>
       </div>
-    </div>
+    </NotificationProvider>
   );
 }
 
