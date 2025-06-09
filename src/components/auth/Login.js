@@ -38,13 +38,13 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-lg">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-800 px-4">
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg">
         <h2 className="text-2xl font-semibold mb-6 text-center">Login</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Email
             </label>
             <input
@@ -52,7 +52,7 @@ export default function Login() {
               type="email"
               autoFocus
               {...register("email")}
-              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
               aria-invalid={!!errors.email}
               aria-describedby="email-error"
             />
@@ -65,7 +65,7 @@ export default function Login() {
 
           {/* Password */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Password
             </label>
             <div className="relative">
@@ -73,14 +73,14 @@ export default function Login() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 {...register("password")}
-                className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600"
+                className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
                 aria-invalid={!!errors.password}
                 aria-describedby="password-error"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 top-3 text-sm text-gray-600"
+                className="absolute right-3 top-3 text-sm text-gray-600 dark:text-gray-300"
                 aria-label="Toggle password visibility"
               >
                 {showPassword ? "Hide" : "Show"}
@@ -111,7 +111,7 @@ export default function Login() {
         </form>
 
         {/* Register */}
-        <div className="mt-6 text-center text-sm text-gray-600">
+        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
           Don’t have an account?{" "}
           <Link to="/register" className="text-primary-600 hover:underline font-medium">
             Register Now

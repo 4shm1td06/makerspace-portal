@@ -8,7 +8,6 @@ import { authService } from "../../services/authService";
 
 const registerSchema = z
   .object({
-    full_name: z.string().min(2, "Full name is required"),
     email: z.string().email("Invalid email"),
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
@@ -30,14 +29,11 @@ export default function Register() {
     resolver: zodResolver(registerSchema),
   });
 
-  const onSubmit = async ({ full_name, email, password }) => {
+  const onSubmit = async ({ email, password }) => {
     setLoading(true);
 
-    // Step 1: Sign up the user
-    const { error: signUpError } = await authService.signUp(email, password, {
-      full_name,
-      membership_type: "basic",
-    });
+    // Call signUp without user metadata
+    const { error: signUpError } = await authService.signUp(email, password);
 
     if (signUpError) {
       setLoading(false);
@@ -45,7 +41,7 @@ export default function Register() {
       return;
     }
 
-    // Step 2: Sign in the user
+    // Automatically sign in after successful signup
     const { error: signInError } = await authService.signIn(email, password);
 
     if (signInError) {
@@ -55,44 +51,29 @@ export default function Register() {
       return;
     }
 
-    // Step 3: Redirect to complete profile
     setLoading(false);
     toast.success("Account created!");
-    navigate("/complete-profile");
+    navigate("/login");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-lg">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-800 px-4">
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg">
         <h2 className="text-2xl font-semibold mb-6 text-center">Create Account</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-
-          {/* Full Name */}
-          <div>
-            <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
-              Full Name
-            </label>
-            <input
-              id="full_name"
-              type="text"
-              {...register("full_name")}
-              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600"
-            />
-            {errors.full_name && (
-              <p className="text-red-600 text-sm mt-1">{errors.full_name.message}</p>
-            )}
-          </div>
-
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
               Email
             </label>
             <input
               id="email"
               type="email"
               {...register("email")}
-              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
             {errors.email && (
               <p className="text-red-600 text-sm mt-1">{errors.email.message}</p>
@@ -101,14 +82,17 @@ export default function Register() {
 
           {/* Password */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
               Password
             </label>
             <input
               id="password"
               type="password"
               {...register("password")}
-              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
             {errors.password && (
               <p className="text-red-600 text-sm mt-1">{errors.password.message}</p>
@@ -117,14 +101,17 @@ export default function Register() {
 
           {/* Confirm Password */}
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="confirmPassword"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
               Confirm Password
             </label>
             <input
               id="confirmPassword"
               type="password"
               {...register("confirmPassword")}
-              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
             {errors.confirmPassword && (
               <p className="text-red-600 text-sm mt-1">{errors.confirmPassword.message}</p>
@@ -142,9 +129,12 @@ export default function Register() {
         </form>
 
         {/* Login Redirect */}
-        <div className="mt-6 text-center text-sm text-gray-600">
+        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
           Already have an account?{" "}
-          <Link to="/login" className="text-primary-600 hover:underline font-medium">
+          <Link
+            to="/login"
+            className="text-primary-600 hover:underline font-medium"
+          >
             Login
           </Link>
         </div>

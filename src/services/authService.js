@@ -1,32 +1,32 @@
 import { supabase } from './supabase';
 
 export const authService = {
-  signUp: async (email, password, userData) => {
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+  signUp: async (email, password) => {
+    // Sign up without extra user metadata
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: userData,
-      },
     });
 
-    if (signUpError || !signUpData.user) return { error: signUpError };
+    if (error || !data.user) return { error };
 
-    const userId = signUpData.user.id;
+    // Create profile entry with minimal info (id and email)
+    const userId = data.user.id;
 
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: userId,
-      email,
-      ...userData,
-    });
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: userId,
+        email,
+      });
 
     if (profileError) {
-      // Optionally delete user if profile creation fails (requires admin privileges)
+      // Optional: handle cleanup if profile insert fails
       // await supabase.auth.admin.deleteUser(userId);
       return { error: profileError };
     }
 
-    return { data: signUpData, error: null };
+    return { data, error: null };
   },
 
   signIn: async (email, password) => {
@@ -42,9 +42,7 @@ export const authService = {
     return { error };
   },
 
-  getCurrentUser: () => {
-    return supabase.auth.getUser();
-  },
+  getCurrentUser: () => supabase.auth.getUser(),
 
   resetPassword: async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email);

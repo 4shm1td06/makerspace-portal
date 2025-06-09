@@ -4,6 +4,7 @@ import ActivityStatus from './ActivityStatus';
 import EmergencyInfo from './EmergencyInfo';
 import MemberInfoCard from './MemberInfoCard';
 
+
 const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-6">
@@ -43,6 +44,7 @@ const Dashboard = () => {
           {/* Add more <MemberInfoCard /> components as needed */}
         </div>
       </div>
+      
     </div>
   );
 };

@@ -173,11 +173,9 @@ const SettingsPage = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="text-sm text-gray-500 dark:text-gray-400 hover:underline">{showPassword ? "Hide" : "Show"}
-                </button>
+              <button type="button" onClick={() => setShowPassword((prev) => !prev)} className="text-sm text-gray-500 dark:text-gray-400 hover:underline">
+                {showPassword ? "Hide" : "Show"}
+              </button>
             </div>
 
             <div className="mt-6 flex justify-end space-x-4">

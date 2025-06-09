@@ -48,56 +48,56 @@ export default function CompleteProfile() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-xl bg-white p-6 rounded-xl shadow-md">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-800 px-4">
+      <div className="w-full max-w-xl bg-white dark:bg-gray-900 p-6 rounded-xl shadow-md">
         <h2 className="text-2xl font-semibold mb-6 text-center">Complete Your Profile</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
           <div>
-            <label className="block text-sm font-medium">Full Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
             <input
               {...register("name", { required: true })}
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
             {errors.name && <p className="text-red-500 text-sm">Name is required</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Registration Number</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Registration Number</label>
             <input
               {...register("reg_no", { required: true })}
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
             {errors.reg_no && <p className="text-red-500 text-sm">Registration number is required</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Mobile Number</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Mobile Number</label>
             <input
               {...register("mobile_no", { required: true })}
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
             {errors.mobile_no && <p className="text-red-500 text-sm">Mobile number is required</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Emergency Contact</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Emergency Contact</label>
             <input
               {...register("emergency_contact")}
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 "
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Blood Type</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Blood Type</label>
             <input
               {...register("blood_type")}
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Age</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Age</label>
             <input
               type="number"
               {...register("age", {
@@ -111,24 +111,24 @@ export default function CompleteProfile() {
                   message: "Maximum age is 80",
                 },
               })}
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
             {errors.age && <p className="text-red-500 text-sm">{errors.age.message}</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Address</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
             <textarea
               {...register("address")}
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium">Avatar URL</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Avatar URL</label>
             <input
               {...register("avatar_url")}
-              className="w-full border p-2 rounded"
+              className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
             />
           </div>
 
