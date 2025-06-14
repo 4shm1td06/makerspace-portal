@@ -1,68 +1,62 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase';
 import { format, isToday, parseISO } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const listVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.15 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0 },
+};
 
 const ActivityStatus = () => {
   const [projectCount, setProjectCount] = useState(0);
+  const [projectList, setProjectList] = useState([]);
   const [lastLogin, setLastLogin] = useState('');
   const [userId, setUserId] = useState(null);
+  const [flipped, setFlipped] = useState(false);
 
-  // Fetch user info
   useEffect(() => {
     const fetchUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-
+      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-
-        // Set last login
         const loginDate = parseISO(user.last_sign_in_at);
-        const display = isToday(loginDate)
-          ? 'Today'
-          : format(loginDate, 'PPpp');
-        setLastLogin(display);
-      } else {
-        setLastLogin('Unknown');
+        setLastLogin(isToday(loginDate) ? 'Today' : format(loginDate, 'PPpp'));
       }
     };
-
     fetchUser();
   }, []);
 
-  // Fetch and listen to project count
   useEffect(() => {
     if (!userId) return;
 
-    const fetchCount = async () => {
-      const { count, error } = await supabase
+    const fetchProjects = async () => {
+      const { data, count } = await supabase
         .from('projects')
-        .select('*', { count: 'exact', head: true })
+        .select('*', { count: 'exact' })
         .eq('owner_id', userId);
-
-      if (!error && typeof count === 'number') {
-        setProjectCount(count);
-      }
+      setProjectList(data || []);
+      setProjectCount(count || 0);
     };
 
-    fetchCount();
+    fetchProjects();
 
     const channel = supabase
       .channel('realtime:project-count')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'projects',
-          filter: `owner_id=eq.${userId}`,
-        },
-        () => {
-          fetchCount(); // Refresh on insert/update/delete
-        }
-      )
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'projects',
+        filter: `owner_id=eq.${userId}`,
+      }, fetchProjects)
       .subscribe();
 
     return () => {
@@ -70,12 +64,71 @@ const ActivityStatus = () => {
     };
   }, [userId]);
 
+  const handleDragEnd = (event, info) => {
+    if (info.offset.x < -100 || info.offset.x > 100 || Math.abs(info.offset.y) > 100) {
+      setFlipped(!flipped);
+    }
+  };
+
   return (
-    <div className="card">
-      <h2 className="text-lg font-semibold mb-2">Activity Status</h2>
-      <p>You're currently active in {projectCount} project(s).</p>
-      <p>Last login: {lastLogin}</p>
-    </div>
+    <motion.div
+      className="w-full max-w-md mx-auto my-6 cursor-pointer"
+      onClick={() => setFlipped(!flipped)}
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="relative h-64">
+        <AnimatePresence initial={false} mode="wait">
+          {!flipped ? (
+            <motion.div
+              key="front"
+              initial={{ rotateY: 180 }}
+              animate={{ rotateY: 0 }}
+              exit={{ rotateY: 180 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="absolute inset-0 bg-white dark:bg-gray-800 text-black dark:text-white p-4 rounded-xl shadow-md backface-hidden"
+              style={{ transformStyle: 'preserve-3d' }}
+            >
+              <h2 className="text-xl font-semibold mb-2">Activity Status</h2>
+              <p>You're active in {projectCount} project(s).</p>
+              <p>Last login: {lastLogin}</p>
+              <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Click or swipe to view projects</p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="back"
+              initial={{ rotateY: -180 }}
+              animate={{ rotateY: 0 }}
+              exit={{ rotateY: -180 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="absolute inset-0 bg-white dark:bg-gray-800 text-black dark:text-white p-4 rounded-xl shadow-md backface-hidden"
+              style={{ transformStyle: 'preserve-3d' }}
+            >
+              <h2 className="text-xl font-semibold mb-2">Your Projects</h2>
+              <motion.ul
+                className="space-y-2 max-h-48 overflow-y-auto pr-1"
+                variants={listVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                {projectList.map((project) => (
+                  <motion.li
+                    key={project.id}
+                    variants={itemVariants}
+                    className="border-b border-gray-200 dark:border-gray-700 pb-1"
+                  >
+                    <strong>{project.title}</strong>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{project.description}</p>
+                  </motion.li>
+                ))}
+              </motion.ul>
+              <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Click or swipe to go back</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
   );
 };
 

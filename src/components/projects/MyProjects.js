@@ -5,8 +5,11 @@ import ProjectModal from './modal/ProjectModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+const ADMIN_ID = 'YOUR_ADMIN_USER_ID'; // TODO: Replace this with actual Admin user ID
+
 const MyProjects = () => {
   const [projects, setProjects] = useState([]);
+  const [approvalRequests, setApprovalRequests] = useState([]);
   const [filterStatus, setFilterStatus] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [newProject, setNewProject] = useState({ title: '', description: '', status: 'planning' });
@@ -19,6 +22,7 @@ const MyProjects = () => {
 
   useEffect(() => {
     fetchProjects();
+    fetchApprovals();
   }, []);
 
   useEffect(() => {
@@ -27,13 +31,10 @@ const MyProjects = () => {
 
   const fetchProjects = async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      console.error('User not authenticated');
-      setLoading(false);
-      return;
-    }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
 
     const { data, error } = await supabase
       .from('projects')
@@ -41,24 +42,45 @@ const MyProjects = () => {
       .eq('owner_id', user.id)
       .order('id', { ascending: false });
 
-    if (error) {
-      console.error(error);
-    } else {
-      setProjects(data);
-    }
-
+    if (error) console.error(error);
+    else setProjects(data || []);
     setLoading(false);
+  };
+
+  const fetchApprovals = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('approvals')
+      .select('*')
+      .eq('requester_id', user.id)
+      .eq('request_type', 'project')
+      .order('created_at', { ascending: false });
+
+    if (error) console.error('Approval fetch error:', error);
+    else setApprovalRequests(data || []);
+  };
+
+  const resetForm = () => {
+    setIsEditing(false);
+    setEditingProjectId(null);
+    setNewProject({ title: '', description: '', status: 'planning' });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      console.error('User not authenticated:', userError);
-      alert('You must be logged in to create a project.');
+    if (authError || !user) {
+      alert('Authentication failed.');
       setSubmitting(false);
       return;
     }
@@ -70,95 +92,114 @@ const MyProjects = () => {
       owner_id: user.id,
     };
 
-    let result;
-    if (isEditing) {
-      result = await supabase
-        .from('projects')
-        .update(projectData)
-        .eq('id', editingProjectId)
-        .eq('owner_id', user.id);
-    } else {
-      result = await supabase.from('projects').insert([projectData]);
-    }
+    try {
+      if (isEditing) {
+        const { error } = await supabase
+          .from('projects')
+          .update(projectData)
+          .eq('id', editingProjectId)
+          .eq('owner_id', user.id);
 
-    if (result.error) {
-      console.error(result.error);
-      alert('Error saving project: ' + result.error.message);
-    } else {
-      fetchProjects();
-      setShowModal(false);
-      setIsEditing(false);
-      setEditingProjectId(null);
-      setNewProject({ title: '', description: '', status: 'planning' });
+        if (error) throw error;
+
+        fetchProjects();
+        resetForm();
+        setShowModal(false);
+      } else {
+        if (newProject.status === 'active') {
+          const { error: approvalError } = await supabase.from('approvals').insert([
+            {
+              requester_id: user.id,
+              request_type: 'project',
+              request_detail: `ACTIVE project requested: "${newProject.title}"`,
+              status: 'pending',
+            },
+          ]);
+
+          if (approvalError) throw approvalError;
+
+          await supabase.from('notifications').insert([
+            {
+              user_id: ADMIN_ID,
+              type: 'approval_request',
+              message: `Project "${newProject.title}" by ${user.email} requires approval.`,
+              is_read: false,
+            },
+          ]);
+
+          alert('Approval request sent to admin.');
+          fetchApprovals();
+          resetForm();
+          setShowModal(false);
+        } else {
+          const { error } = await supabase.from('projects').insert([projectData]);
+          if (error) throw error;
+
+          fetchProjects();
+          resetForm();
+          setShowModal(false);
+        }
+      }
+    } catch (err) {
+      alert('Error: ' + err.message);
     }
 
     setSubmitting(false);
   };
 
   const handleDelete = async (id) => {
-    const confirmed = window.confirm('Are you sure you want to delete this project?');
-    if (confirmed) {
+    if (!window.confirm('Delete this project?')) return;
+
+    const { error } = await supabase.from('projects').delete().eq('id', id);
+    if (error) {
+      alert('Error deleting project.');
+    } else {
       setProjects((prev) => prev.filter((p) => p.id !== id));
-      const { error } = await supabase.from('projects').delete().eq('id', id);
-      if (error) {
-        console.error(error);
-        fetchProjects();
-      }
     }
   };
 
   const exportCSV = () => {
-    const csvData = filteredProjects.map(({ id, ...rest }) => rest);
-    if (csvData.length === 0) {
-      alert('No data to export.');
-      return;
-    }
+    const csvData = filteredProjects.map(({ id, ...row }) => row);
+    if (!csvData.length) return alert('No data to export.');
 
-    const escapeCSV = (value) =>
-      typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value;
+    const headers = Object.keys(csvData[0]);
+    const rows = csvData.map((row) =>
+      headers.map((key) => `"${(row[key] || '').toString().replace(/"/g, '""')}"`).join(',')
+    );
 
-    const csv = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map((row) => Object.values(row).map(escapeCSV).join(',')),
-    ].join('\n');
+    const blob = new Blob([headers.join(',') + '\n' + rows.join('\n')], {
+      type: 'text/csv',
+    });
 
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = URL.createObjectURL(blob);
     a.download = 'projects.csv';
     a.click();
-    window.URL.revokeObjectURL(url);
   };
 
   const exportPDF = () => {
+    if (!filteredProjects.length) return alert('No projects to export.');
+
     const doc = new jsPDF();
     doc.text('My Projects', 14, 16);
 
-    if (filteredProjects.length === 0) {
-      alert('No projects to export.');
-      return;
-    }
-
-    const tableData = filteredProjects.map((project, index) => [
-      index + 1,
-      project.owner_id,
-      project.title,
-      project.description || 'No description',
-      project.status,
-      new Date(project.created_at).toLocaleDateString(),
-      new Date(project.deadline).toLocaleDateString(),
+    const tableData = filteredProjects.map((p, i) => [
+      i + 1,
+      p.owner_id,
+      p.title,
+      p.description || '—',
+      p.status,
+      new Date(p.created_at).toLocaleDateString(),
+      p.deadline ? new Date(p.deadline).toLocaleDateString() : '—',
     ]);
 
-    doc.autoTable({
-      head: [['#', 'Owner ID', 'Title', 'Description', 'Status', 'Created At', 'Deadline']],
+    autoTable(doc, {
+      head: [['#', 'Owner', 'Title', 'Description', 'Status', 'Created', 'Deadline']],
       body: tableData,
       startY: 20,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [0, 123, 255] },
     });
 
-    doc.save('my-projects.pdf');
+    doc.save('projects.pdf');
   };
 
   const filteredProjects = filterStatus
@@ -179,48 +220,47 @@ const MyProjects = () => {
           <button
             onClick={() => {
               setShowModal(true);
-              setIsEditing(false);
-              setNewProject({ title: '', description: '', status: 'planning' });
+              resetForm();
             }}
-            className="bg-blue-600 dark:bg-blue-500 text-white px-4 py-2 rounded-xl shadow hover:bg-blue-700 dark:hover:bg-blue-600"
+            className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700"
           >
             + Add Project
           </button>
           <button
             onClick={exportCSV}
-            className="bg-green-600 dark:bg-green-500 text-white px-4 py-2 rounded-xl shadow hover:bg-green-700 dark:hover:bg-green-600"
+            className="bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700"
           >
             Export CSV
           </button>
           <button
             onClick={exportPDF}
-            className="bg-red-600 dark:bg-red-500 text-white px-4 py-2 rounded-xl shadow hover:bg-red-700 dark:hover:bg-red-600"
+            className="bg-red-600 text-white px-4 py-2 rounded-xl hover:bg-red-700"
           >
             Export PDF
           </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap">
         {['planning', 'active', 'completed'].map((status) => (
           <button
             key={status}
-            onClick={() => setFilterStatus(filterStatus === status ? '' : status)}
+            onClick={() => setFilterStatus((prev) => (prev === status ? '' : status))}
             className={`px-4 py-2 rounded-full text-sm font-medium border transition ${
               filterStatus === status
-                ? 'bg-blue-600 text-white border-blue-600 dark:bg-blue-500 dark:border-blue-500'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
             }`}
           >
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+            {status}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <p className="text-center text-gray-500 dark:text-gray-400">Loading projects...</p>
+        <p className="text-center text-gray-500">Loading...</p>
       ) : filteredProjects.length === 0 ? (
-        <p className="text-center text-gray-500 dark:text-gray-400 italic">No projects found for this status.</p>
+        <p className="text-center italic text-gray-500">No projects found.</p>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {paginatedProjects.map((project) => (
@@ -233,28 +273,28 @@ const MyProjects = () => {
                 setIsEditing(true);
                 setShowModal(true);
               }}
-              onDelete={handleDelete}
+              onDelete={() => handleDelete(project.id)}
             />
           ))}
         </div>
       )}
 
-      {!loading && totalPages > 1 && (
-        <div className="mt-6 flex justify-center gap-4 text-sm">
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center gap-4">
           <button
+            onClick={() => setCurrentPage((p) => p - 1)}
             disabled={currentPage === 1}
-            onClick={() => setCurrentPage((prev) => prev - 1)}
-            className="px-4 py-2 rounded border bg-white hover:bg-gray-100 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:bg-gray-700"
+            className="px-4 py-2 border rounded disabled:opacity-50"
           >
-            ← Previous
+            ← Prev
           </button>
-          <span className="text-gray-600 dark:text-gray-300">
+          <span>
             Page {currentPage} of {totalPages}
           </span>
           <button
+            onClick={() => setCurrentPage((p) => p + 1)}
             disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((prev) => prev + 1)}
-            className="px-4 py-2 rounded border bg-white hover:bg-gray-100 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:bg-gray-700"
+            className="px-4 py-2 border rounded disabled:opacity-50"
           >
             Next →
           </button>
@@ -269,12 +309,40 @@ const MyProjects = () => {
         onChange={setNewProject}
         onClose={() => {
           setShowModal(false);
-          setIsEditing(false);
-          setEditingProjectId(null);
-          setNewProject({ title: '', description: '', status: 'planning' });
+          resetForm();
         }}
         onSubmit={handleSubmit}
       />
+
+      {approvalRequests.length > 0 && (
+        <div className="mt-10">
+          <h3 className="text-lg font-semibold mb-2">Your Approval Requests</h3>
+          <ul className="space-y-2">
+            {approvalRequests.map((req) => (
+              <li key={req.id} className="border p-4 rounded shadow">
+                <p className="text-sm text-gray-600">
+                  <strong>Requested:</strong> {new Date(req.created_at).toLocaleString()}
+                </p>
+                <p className="text-sm">
+                  <strong>Status:</strong>{' '}
+                  <span
+                    className={`px-2 py-1 text-xs rounded-full font-semibold ${
+                      req.status === 'pending'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : req.status === 'approved'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    {req.status}
+                  </span>
+                </p>
+                <p className="text-sm mt-2 text-gray-700">{req.request_detail}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 };

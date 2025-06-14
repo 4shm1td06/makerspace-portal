@@ -13,21 +13,21 @@ const Dashboard = () => {
       </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-gray-800 shadow-xl dark:shadow-black/40 rounded-2xl p-4">
+        <div className="bg-gray-100 dark:bg-gray-700 shadow-xl dark:shadow-black/40 rounded-2xl p-4">
           <h2 className="text-xl font-semibold mb-2 text-gray-700 dark:text-gray-200">
             Personal Info
           </h2>
           <PersonalInfo />
         </div>
 
-        <div className="bg-white dark:bg-gray-800 shadow-xl dark:shadow-black/40 rounded-2xl p-4">
+        <div className="bg-gray-100 dark:bg-gray-700 shadow-xl dark:shadow-black/40 rounded-2xl p-4">
           <h2 className="text-xl font-semibold mb-2 text-gray-700 dark:text-gray-200">
             Activity Status
           </h2>
           <ActivityStatus />
         </div>
 
-        <div className="bg-white dark:bg-gray-800 shadow-xl dark:shadow-black/40 rounded-2xl p-4">
+        <div className="bg-gray-100 dark:bg-gray-700 shadow-xl dark:shadow-black/40 rounded-2xl p-4">
           <h2 className="text-xl font-semibold mb-2 text-gray-700 dark:text-gray-200">
             Emergency Info
           </h2>

@@ -58,6 +58,9 @@ const MemberInfoCard = () => {
           <span className="font-medium text-gray-600 dark:text-gray-400">Phone:</span> {profile.mobile_no}
         </div>
         <div>
+          <span className="font-medium text-gray-600 dark:text-gray-400">Blood Type:</span> {profile.blood_type}
+        </div>
+        <div>
           <span className="font-medium text-gray-600 dark:text-gray-400">Role:</span> {profile.role || 'Member'}
         </div>
         <div>
