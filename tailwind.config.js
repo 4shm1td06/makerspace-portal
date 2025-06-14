@@ -6,6 +6,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      transformOrigin: {
+        'center': 'center',
+      },
       colors: {
         primary: {
           50: '#eff6ff',
@@ -23,3 +26,4 @@ module.exports = {
     require('@tailwindcss/line-clamp'),
   ],
 };
+
