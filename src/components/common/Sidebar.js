@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
-  Home, ClipboardList, Boxes, Calendar, Users, Settings, LogOut, X,
+  Home, ClipboardList, Boxes, Calendar, Users, Settings, LogOut, X, Newspaper,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { supabase } from '../../services/supabase';
@@ -11,8 +11,8 @@ const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: <Home /> },
   { name: 'Projects', path: '/projects', icon: <ClipboardList /> },
   { name: 'Inventory', path: '/inventory', icon: <Boxes /> },
-  { name: 'Events', path: '/news-events', icon: <Calendar /> },
-  { name: 'Members', path: '/members', icon: <Users />, roles: ['admin'] },
+  { name: 'News', path: '/news-events', icon: <Newspaper /> },
+  { name: 'Calendar', path: '/reminders', icon: <Calendar /> },
   { name: 'Settings', path: '/settings', icon: <Settings /> },
 ];
 

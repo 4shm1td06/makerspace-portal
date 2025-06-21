@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --btn-bg-color: #3b82f6;
+  }
+  .dark {
+    --btn-bg-color: #dc2626;
+  }
+
+  body {
+    @apply font-sans text-gray-800 bg-gray-50 dark:bg-black dark:text-white;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5 {
+    @apply font-semibold text-gray-900 dark:text-white;
+  }
+
+  a {
+    @apply text-blue-600 hover:underline dark:text-blue-400;
+  }
+}
+
+/* 3D transform helpers */
+.backface-hidden {
+  backface-visibility: hidden;
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+.transform-style-preserve-3d {
+  transform-style: preserve-3d;
+}
+.perspective-\[1000px\] {
+  perspective: 1000px;
+}
+
+/* ===== FullCalendar Styles ===== */
+.fc {
+  font-family: inherit;
+  font-size: 1rem;
+  background-color: transparent;
+}
+.fc table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.fc th,
+.fc td {
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb; /* Tailwind gray-200 */
+}
+.fc-daygrid-day-number {
+  float: right;
+  padding: 0.25rem;
+  font-weight: 600;
+  color: #2563eb; /* Tailwind blue-600 */
+}
+.fc-day-today {
+  background-color: #eff6ff; /* Tailwind blue-50 */
+}
+.dark .fc-day-today {
+  background-color: #1e3a8a; /* Tailwind blue-900 */
+}
+.fc-event {
+  background-color: #2563eb;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fc-toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.fc-button {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.25rem;
+  margin-left: 0.25rem;
+  margin-right: 0.25rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.fc-button:hover {
+  background-color: #1d4ed8; /* Tailwind blue-700 */
+}
+.fc-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

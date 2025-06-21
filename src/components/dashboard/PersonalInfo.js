@@ -41,6 +41,7 @@ const PersonalInfo = () => {
       <p className="text-gray-700 dark:text-gray-300"><strong>Email:</strong> {profile.email}</p>
       <p className="text-gray-700 dark:text-gray-300"><strong>Phone:</strong> {profile.mobile_no}</p>
       <p className="text-gray-700 dark:text-gray-300"><strong>Address:</strong> {profile.address}</p>
+      <p className="text-gray-700 dark:text-gray-300"><strong>Registration No:</strong> {profile.reg_no}</p>
       <p className="text-gray-700 dark:text-gray-300"><strong>Role:</strong> {profile.role}</p>
     </div>
   );

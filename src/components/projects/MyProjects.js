@@ -5,11 +5,8 @@ import ProjectModal from './modal/ProjectModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const ADMIN_ID = 'YOUR_ADMIN_USER_ID'; // TODO: Replace this with actual Admin user ID
-
 const MyProjects = () => {
   const [projects, setProjects] = useState([]);
-  const [approvalRequests, setApprovalRequests] = useState([]);
   const [filterStatus, setFilterStatus] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [newProject, setNewProject] = useState({ title: '', description: '', status: 'planning' });
@@ -22,7 +19,6 @@ const MyProjects = () => {
 
   useEffect(() => {
     fetchProjects();
-    fetchApprovals();
   }, []);
 
   useEffect(() => {
@@ -40,28 +36,11 @@ const MyProjects = () => {
       .from('projects')
       .select('*')
       .eq('owner_id', user.id)
-      .order('id', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) console.error(error);
     else setProjects(data || []);
     setLoading(false);
-  };
-
-  const fetchApprovals = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('approvals')
-      .select('*')
-      .eq('requester_id', user.id)
-      .eq('request_type', 'project')
-      .order('created_at', { ascending: false });
-
-    if (error) console.error('Approval fetch error:', error);
-    else setApprovalRequests(data || []);
   };
 
   const resetForm = () => {
@@ -88,8 +67,8 @@ const MyProjects = () => {
     const projectData = {
       title: newProject.title,
       description: newProject.description,
-      status: newProject.status,
       owner_id: user.id,
+      status: newProject.status === 'active' ? 'pending' : newProject.status, // active → pending
     };
 
     try {
@@ -106,39 +85,16 @@ const MyProjects = () => {
         resetForm();
         setShowModal(false);
       } else {
-        if (newProject.status === 'active') {
-          const { error: approvalError } = await supabase.from('approvals').insert([
-            {
-              requester_id: user.id,
-              request_type: 'project',
-              request_detail: `ACTIVE project requested: "${newProject.title}"`,
-              status: 'pending',
-            },
-          ]);
+        const { error } = await supabase.from('projects').insert([projectData]);
+        if (error) throw error;
 
-          if (approvalError) throw approvalError;
-
-          await supabase.from('notifications').insert([
-            {
-              user_id: ADMIN_ID,
-              type: 'approval_request',
-              message: `Project "${newProject.title}" by ${user.email} requires approval.`,
-              is_read: false,
-            },
-          ]);
-
-          alert('Approval request sent to admin.');
-          fetchApprovals();
-          resetForm();
-          setShowModal(false);
-        } else {
-          const { error } = await supabase.from('projects').insert([projectData]);
-          if (error) throw error;
-
-          fetchProjects();
-          resetForm();
-          setShowModal(false);
+        if (projectData.status === 'pending') {
+          alert('Your request for activating this project has been sent to admin.');
         }
+
+        fetchProjects();
+        resetForm();
+        setShowModal(false);
       }
     } catch (err) {
       alert('Error: ' + err.message);
@@ -242,7 +198,7 @@ const MyProjects = () => {
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
-        {['planning', 'active', 'completed'].map((status) => (
+        {['planning', 'pending', 'active', 'completed', 'rejected'].map((status) => (
           <button
             key={status}
             onClick={() => setFilterStatus((prev) => (prev === status ? '' : status))}
@@ -313,36 +269,6 @@ const MyProjects = () => {
         }}
         onSubmit={handleSubmit}
       />
-
-      {approvalRequests.length > 0 && (
-        <div className="mt-10">
-          <h3 className="text-lg font-semibold mb-2">Your Approval Requests</h3>
-          <ul className="space-y-2">
-            {approvalRequests.map((req) => (
-              <li key={req.id} className="border p-4 rounded shadow">
-                <p className="text-sm text-gray-600">
-                  <strong>Requested:</strong> {new Date(req.created_at).toLocaleString()}
-                </p>
-                <p className="text-sm">
-                  <strong>Status:</strong>{' '}
-                  <span
-                    className={`px-2 py-1 text-xs rounded-full font-semibold ${
-                      req.status === 'pending'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : req.status === 'approved'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    {req.status}
-                  </span>
-                </p>
-                <p className="text-sm mt-2 text-gray-700">{req.request_detail}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </section>
   );
 };

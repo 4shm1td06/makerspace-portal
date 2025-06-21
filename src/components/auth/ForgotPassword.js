@@ -34,20 +34,20 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-lg">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-800 px-4">
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 p-6 rounded-xl shadow-lg">
         <h2 className="text-2xl font-semibold mb-6 text-center">Forgot Password</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Email
             </label>
             <input
               id="email"
               type="email"
               {...register("email")}
-              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600"
+              className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:ring-primary-600 focus:border-primary-600 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 focus:outline-none"
             />
             {errors.email && (
               <p className="text-red-600 text-sm mt-1">{errors.email.message}</p>
@@ -65,7 +65,7 @@ export default function ForgotPassword() {
         </form>
 
         {/* Back to login */}
-        <div className="mt-6 text-center text-sm text-gray-600">
+        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
           Remember your password?{" "}
           <Link to="/login" className="text-primary-600 hover:underline font-medium">
             Go to Login

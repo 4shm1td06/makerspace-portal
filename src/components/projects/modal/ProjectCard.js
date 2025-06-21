@@ -1,9 +1,28 @@
 import React from 'react';
+import { Pen, Trash } from 'lucide-react';
 
 const ProjectCard = ({ project, onEdit, onDelete }) => {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow p-6 border border-gray-100 dark:border-gray-700 transition hover:shadow-md">
-      <div className="flex justify-between items-center mb-2">
+    <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow p-6 border border-gray-100 dark:border-gray-700 transition hover:shadow-md">
+      {/* Icon buttons in top-right */}
+      <div className="absolute top-3 right-3 flex gap-2">
+        <button
+          onClick={() => onEdit(project)}
+          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
+          title="Edit"
+        >
+          <Pen size={18} />
+        </button>
+        <button
+          onClick={() => onDelete(project.id)}
+          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+          title="Delete"
+        >
+          <Trash size={18} />
+        </button>
+      </div>
+
+      <div className="flex justify-between items-center mb-2 pr-10">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white">{project.title}</h3>
         <span
           className={`text-xs px-2 py-1 rounded-full capitalize font-semibold
@@ -31,21 +50,6 @@ const ProjectCard = ({ project, onEdit, onDelete }) => {
         {project.created_at && (
           <div><strong>Created:</strong> {new Date(project.created_at).toLocaleDateString()}</div>
         )}
-      </div>
-
-      <div className="flex justify-end gap-3 mt-4">
-        <button
-          onClick={() => onEdit(project)}
-          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => onDelete(project.id)}
-          className="text-sm text-red-600 dark:text-red-400 hover:underline"
-        >
-          Delete
-        </button>
       </div>
     </div>
   );

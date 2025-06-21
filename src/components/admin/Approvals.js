@@ -3,149 +3,94 @@ import { supabase } from '../../services/supabase';
 import { toast } from 'react-toastify';
 
 const Approvals = () => {
-  const [projectApprovals, setProjectApprovals] = useState([]);
-  const [supplyRequests, setSupplyRequests] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchPendingProjects = async () => {
     setLoading(true);
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, title, description, owner_id, created_at')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
 
-    const [{ data: approvals, error: approvalError }, { data: supplies, error: supplyError }] =
-      await Promise.all([
-        supabase.from('approvals').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
-        supabase.from('supply_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
-      ]);
-
-    if (approvalError || supplyError) {
-      toast.error('Failed to load approvals or supply requests');
-      console.error(approvalError || supplyError);
+    if (error) {
+      toast.error('Failed to fetch pending projects');
+      console.error(error);
     } else {
-      setProjectApprovals(approvals);
-      setSupplyRequests(supplies);
+      setProjects(data);
     }
 
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const handleDecision = async (id, status) => {
+    const { data: { user } } = await supabase.auth.getUser();
 
-  const handleProjectDecision = async (id, status) => {
-    const { error } = await supabase.from('approvals').update({ status }).eq('id', id);
+    const { error } = await supabase
+      .from('projects')
+      .update({
+        status,
+        approved_by: user.id,
+        approved_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
     if (error) {
-      toast.error('Failed to update project approval');
+      toast.error('Failed to update project status');
       console.error(error);
     } else {
       toast.success(`Project ${status}`);
-      setProjectApprovals((prev) => prev.filter((item) => item.id !== id));
+      setProjects((prev) => prev.filter((p) => p.id !== id));
     }
   };
 
-  const handleSupplyDecision = async (id, status) => {
-    const { error } = await supabase.from('supply_requests').update({ status }).eq('id', id);
-    if (error) {
-      toast.error('Failed to update supply request');
-      console.error(error);
-    } else {
-      toast.success(`Supply request ${status}`);
-      setSupplyRequests((prev) => prev.filter((item) => item.id !== id));
-    }
-  };
+  useEffect(() => {
+    fetchPendingProjects();
+  }, []);
 
-  if (loading) return <div className="p-4">Loading approvals...</div>;
+  if (loading) return <div className="p-4">Loading pending projects...</div>;
 
   return (
-    <div className="p-4 space-y-8">
-      {/* Project Approvals Section */}
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Project Approvals</h2>
-        {projectApprovals.length === 0 ? (
-          <p>No pending project approvals</p>
-        ) : (
-          <table className="w-full table-auto border-collapse border border-gray-300 dark:border-gray-600">
-            <thead>
-              <tr className="bg-gray-200 dark:bg-gray-700">
-                <th className="border p-2 text-left">Request</th>
-                <th className="border p-2">Submitted At</th>
-                <th className="border p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projectApprovals.map(({ id, request_detail, created_at }) => (
-                <tr key={id} className="hover:bg-gray-100 dark:hover:bg-gray-800">
-                  <td className="border p-2">{request_detail}</td>
-                  <td className="border p-2">{new Date(created_at).toLocaleString()}</td>
-                  <td className="border p-2 text-center space-x-2">
-                    <button
-                      onClick={() => handleProjectDecision(id, 'approved')}
-                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => handleProjectDecision(id, 'rejected')}
-                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
-                    >
-                      Reject
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Project Approvals</h1>
 
-      {/* Supply Requests Section */}
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Supply Requests</h2>
-        {supplyRequests.length === 0 ? (
-          <p>No pending supply requests</p>
-        ) : (
-          <table className="w-full table-auto border-collapse border border-gray-300 dark:border-gray-600">
-            <thead>
-              <tr className="bg-gray-200 dark:bg-gray-700">
-                <th className="border p-2 text-left">Item</th>
-                <th className="border p-2">Qty</th>
-                <th className="border p-2">Urgency</th>
-                <th className="border p-2">Purpose</th>
-                <th className="border p-2">Submitted At</th>
-                <th className="border p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {supplyRequests.map(
-                ({ id, item_name, quantity, unit, urgency, purpose, created_at }) => (
-                  <tr key={id} className="hover:bg-gray-100 dark:hover:bg-gray-800">
-                    <td className="border p-2">{item_name}</td>
-                    <td className="border p-2 text-center">
-                      {quantity} {unit}
-                    </td>
-                    <td className="border p-2 text-center">{urgency}</td>
-                    <td className="border p-2">{purpose}</td>
-                    <td className="border p-2">{new Date(created_at).toLocaleString()}</td>
-                    <td className="border p-2 text-center space-x-2">
-                      <button
-                        onClick={() => handleSupplyDecision(id, 'approved')}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleSupplyDecision(id, 'rejected')}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
-                      >
-                        Reject
-                      </button>
-                    </td>
-                  </tr>
-                )
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {projects.length === 0 ? (
+        <p>No pending project requests.</p>
+      ) : (
+        <div className="space-y-4">
+          {projects.map((project) => (
+            <div
+              key={project.id}
+              className="p-4 bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-semibold">{project.title}</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{project.description}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Submitted at: {new Date(project.created_at).toLocaleString()}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDecision(project.id, 'active')}
+                    className="px-4 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleDecision(project.id, 'rejected')}
+                    className="px-4 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
