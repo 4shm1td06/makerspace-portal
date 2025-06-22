@@ -1,4 +1,3 @@
-// All your existing imports...
 import React, { useEffect, useState, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -11,9 +10,10 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../../hooks/useAuth';
 import { format, add, eachDayOfInterval } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import classNames from 'classnames';
 
 const CATEGORY_COLORS = {
+  Meeting: '#2563eb',
+  Workshop: '#059669',
   Deadline: '#b91c1c',
   Personal: '#d97706',
 };
@@ -22,9 +22,9 @@ const RECURRENCE_OPTIONS = ['None', 'Daily', 'Weekly', 'Monthly'];
 
 const Events = () => {
   const { user } = useAuth();
+  const [profile, setProfile] = useState(null);
   const [events, setEvents] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -32,26 +32,35 @@ const Events = () => {
     date: '',
     start_time: '',
     end_time: '',
-    reminder: false,
     category: 'Meeting',
     recurrence: 'None',
+    reminder: false,
+    meeting_url: null,
   });
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [search, setSearch] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [activeCategories, setActiveCategories] = useState(Object.keys(CATEGORY_COLORS));
+  const [showOnlyMine, setShowOnlyMine] = useState(false);
   const calendarRef = useRef();
 
+  const isAdmin = profile?.role === 'admin' || profile?.department === 'management';
+  const isMember = profile?.role === 'member' || profile?.department === 'members';
+
   useEffect(() => {
-    const updateMobile = () => setIsMobile(window.innerWidth < 640);
-    updateMobile();
-    window.addEventListener('resize', updateMobile);
-    return () => window.removeEventListener('resize', updateMobile);
-  }, []);
+    if (user) {
+      supabase
+        .from('profiles')
+        .select('role, department, name')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => setProfile(data));
+    }
+  }, [user]);
 
   const fetchEvents = async () => {
     const { data, error } = await supabase.from('events').select('*');
-    if (error) return console.error(error.message);
+    if (error) return toast.error('Failed to fetch events');
     setEvents(buildEventInstances(data));
   };
 
@@ -59,10 +68,11 @@ const Events = () => {
     const result = [];
     data.forEach(evt => {
       const color = CATEGORY_COLORS[evt.category] || '#6b7280';
+      const titleWithIcon = evt.meeting_url ? `${evt.title} 📹` : evt.title;
       const base = {
         id: evt.id,
         groupId: evt.id,
-        title: evt.title + (evt.created_by === user?.id ? ' 👤' : ''),
+        title: titleWithIcon,
         description: evt.description,
         backgroundColor: color,
         borderColor: '#00000020',
@@ -70,24 +80,20 @@ const Events = () => {
         category: evt.category,
         recurrence: evt.recurrence,
         created_by: evt.created_by,
+        meeting_url: evt.meeting_url || null,
       };
       const startDate = new Date(`${evt.date}T${evt.start_time}`);
       const endDate = new Date(`${evt.date}T${evt.end_time}`);
       const recur = evt.recurrence;
-      const allDates = recur === 'None'
-        ? [startDate]
-        : eachDayOfInterval({
-            start: startDate,
-            end: add(startDate, recur === 'Daily' ? { days: 30 } :
-                           recur === 'Weekly' ? { weeks: 12 } :
-                                               { months: 6 })
-          }).filter(d => {
-            if (recur === 'Daily') return true;
-            if (recur === 'Weekly') return d.getDay() === startDate.getDay();
-            if (recur === 'Monthly') return d.getDate() === startDate.getDate();
-            return false;
-          });
-
+      const allDates = recur === 'None' ? [startDate] : eachDayOfInterval({
+        start: startDate,
+        end: add(startDate, recur === 'Daily' ? { days: 30 } : recur === 'Weekly' ? { weeks: 12 } : { months: 6 }),
+      }).filter(d => {
+        if (recur === 'Daily') return true;
+        if (recur === 'Weekly') return d.getDay() === startDate.getDay();
+        if (recur === 'Monthly') return d.getDate() === startDate.getDate();
+        return false;
+      });
       allDates.forEach(date => {
         const st = new Date(date);
         st.setHours(startDate.getHours(), startDate.getMinutes());
@@ -103,35 +109,7 @@ const Events = () => {
     fetchEvents();
   }, []);
 
-  const conflictCheck = (date, startTime, endTime) => {
-    const newStart = new Date(`${date}T${startTime}`);
-    const newEnd = new Date(`${date}T${endTime}`);
-    return events.some(evt => {
-      const s = new Date(evt.start);
-      const e = new Date(evt.end);
-      return (
-        evt.created_by === user?.id &&
-        ((newStart >= s && newStart < e) ||
-         (newEnd > s && newEnd <= e) ||
-         (newStart <= s && newEnd >= e))
-      );
-    });
-  };
-
-  const handleEventMount = (info) => {
-    tippy(info.el, {
-      content: `
-        <strong>${info.event.title.replace(' 👤','')}</strong><br/>
-        ${format(info.event.start, 'Pp')} – ${format(info.event.end, 'Pp')}<br/>
-        ${info.event.extendedProps.description}
-      `,
-      allowHTML: true,
-      theme: 'light-border',
-    });
-  };
-
   const handleDateClick = (info) => {
-    setSelectedDate(info.dateStr);
     setFormData({
       title: '',
       description: '',
@@ -139,9 +117,10 @@ const Events = () => {
       date: info.dateStr,
       start_time: '09:00',
       end_time: '10:00',
-      reminder: false,
-      category: 'Personal',
+      category: isMember ? 'Personal' : 'Meeting',
       recurrence: 'None',
+      reminder: false,
+      meeting_url: null
     });
     setEditMode(false);
     setIsOwner(true);
@@ -149,164 +128,193 @@ const Events = () => {
   };
 
   const handleEventClick = ({ event }) => {
-    const editable = event.extendedProps.created_by === user?.id;
+    const isCreator = event.extendedProps.created_by === user?.id;
     setFormData({
-      title: event.title.replace(' 👤',''),
+      title: event.title.replace(' 📹', ''),
       description: event.extendedProps.description || '',
       id: event.id,
       date: format(event.start, 'yyyy-MM-dd'),
       start_time: format(event.start, 'HH:mm'),
       end_time: format(event.end, 'HH:mm'),
-      reminder: false,
       category: event.extendedProps.category,
       recurrence: event.extendedProps.recurrence || 'None',
+      reminder: false,
+      meeting_url: event.extendedProps.meeting_url || null
     });
-    setSelectedDate(format(event.start, 'yyyy-MM-dd'));
     setEditMode(true);
-    setIsOwner(editable);
+    setIsOwner(isCreator || isAdmin);
     setDrawerOpen(true);
   };
 
   const saveEvent = async () => {
-    const { title, description, id, date, start_time, end_time, category, recurrence } = formData;
+    const {
+      title, description, id, date, start_time, end_time,
+      category, recurrence, reminder
+    } = formData;
+
     if (!title.trim()) return toast.error('Title is required');
-    if (!start_time || !end_time) return toast.error('Time is required');
-    if (conflictCheck(date, start_time, end_time)) return toast.warn('Time conflict detected');
+
+    if (isMember && (category === 'Meeting' || category === 'Workshop')) {
+      return toast.error('You are not allowed to schedule Meetings or Workshops.');
+    }
+
+    let meeting_url = formData.meeting_url;
+
+    if (category === 'Meeting' && isAdmin && !editMode) {
+      const room = `mks-${Math.random().toString(36).substring(2, 6)}-${Date.now()}`;
+      meeting_url = `https://ju-makerspace-meet.duckdns.org/${room}`;
+    }
+
+    const payload = {
+      title,
+      description: meeting_url ? `${description}\n\nJoin: ${meeting_url}` : description,
+      date,
+      start_time,
+      end_time,
+      category,
+      recurrence,
+      reminder,
+      created_by: user.id,
+      meeting_url
+    };
 
     if (editMode && id && isOwner) {
-      const { error } = await supabase.from('events')
-        .update({ title, description, start_time, end_time, category, recurrence })
-        .eq('id', id);
-      if (error) toast.error('Failed to update');
-      else toast.success('Event updated');
+      const { error } = await supabase.from('events').update(payload).eq('id', id);
+      if (error) return toast.error('Failed to update event');
+      toast.success('Event updated');
     } else {
-      const { error } = await supabase.from('events')
-        .insert([{ title, description, date, start_time, end_time, category, recurrence, reminder: false, created_by: user.id }]);
-      if (error) toast.error('Failed to create');
-      else toast.success('Created');
+      const { error } = await supabase.from('events').insert([payload]);
+      if (error) return toast.error('Failed to create event');
+      toast.success('Event created');
+      if (meeting_url) window.open(`/meeting/${meeting_url.split('/').pop()}`, '_blank');
     }
+
     setDrawerOpen(false);
     fetchEvents();
   };
 
+  const deleteEvent = async () => {
+    if (!formData.id || !isOwner) return;
+    const { error } = await supabase.from('events').delete().eq('id', formData.id);
+    if (error) toast.error('Failed to delete event');
+    else {
+      toast.success('Event deleted');
+      setDrawerOpen(false);
+      fetchEvents();
+    }
+  };
+
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-blue-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Sidebar Filters */}
-      <div className="hidden sm:block w-64 bg-white dark:bg-gray-800 border-r dark:border-gray-700 p-4">
-        <h2 className="text-lg font-semibold mb-4">Filters</h2>
-        <ul className="space-y-2 text-sm">
-          <li className="flex items-center"><span className="w-3 h-3 rounded-full bg-indigo-500 mr-2"></span> Your Events</li>
-          {Object.entries(CATEGORY_COLORS).map(([cat, clr]) => (
-            <li key={cat} className="flex items-center">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: clr, marginRight: '0.5rem' }}></span> {cat}
-            </li>
-          ))}
-        </ul>
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
+      {/* Sidebar */}
+      <div className="hidden sm:block w-64 bg-white dark:bg-gray-800 border-r p-4">
+        <h2 className="text-lg font-bold mb-3">Filters</h2>
+        <input type="text" placeholder="Search events..." value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full mb-3 px-2 py-1 border rounded bg-white dark:bg-gray-700 dark:text-white" />
+        {Object.entries(CATEGORY_COLORS).map(([cat, color]) => (
+          <label key={cat} className="flex items-center space-x-2 mb-2">
+            <input type="checkbox" checked={activeCategories.includes(cat)}
+              onChange={() =>
+                setActiveCategories(prev =>
+                  prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+                )
+              }
+            />
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></span>
+            <span>{cat}</span>
+          </label>
+        ))}
+        <label className="flex items-center space-x-2 mt-2">
+          <input type="checkbox" checked={showOnlyMine} onChange={() => setShowOnlyMine(prev => !prev)} />
+          <span>My events only</span>
+        </label>
       </div>
 
       {/* Calendar */}
-      <div className="flex-1 p-4 sm:p-6">
-        <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-          className="text-3xl font-bold mb-4">Team Calendar</motion.h1>
+      <div className="flex-1 p-4">
         <FullCalendar
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay',
-          }}
-          editable selectable eventResizableFromStart
+          headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
+          events={events.filter(e =>
+            activeCategories.includes(e.category) &&
+            (!showOnlyMine || e.created_by === user?.id) &&
+            (search.trim() === '' || e.title.toLowerCase().includes(search.toLowerCase()))
+          )}
           dateClick={handleDateClick}
           eventClick={handleEventClick}
-          events={events}
-          eventDidMount={handleEventMount}
-          height="auto"
+          eventDidMount={({ el, event }) => {
+            tippy(el, {
+              content: `${event.title}<br/>${event.extendedProps.description}`,
+              allowHTML: true,
+              theme: 'light-border',
+            });
+          }}
         />
       </div>
 
-      {/* Drawer Form */}
+      {/* Drawer */}
       <AnimatePresence>
         {drawerOpen && (
-          <motion.div
-            initial={{ y: isMobile ? '100%' : '0', x: isMobile ? 0 : '100%' }}
-            animate={{ y: 0, x: 0 }}
-            exit={{ y: isMobile ? '100%' : '0', x: isMobile ? 0 : '100%' }}
-            transition={{ duration: 0.3 }}
-            className={classNames("fixed inset-0 z-50 bg-white dark:bg-gray-900 shadow-xl border-l dark:border-gray-700 overflow-y-auto", {
-              'sm:right-0 sm:w-[400px]': !isMobile,
-              'w-full h-1/2 bottom-0 left-0': isMobile,
-            })}
-          >
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="text-lg font-semibold">
-                {editMode ? 'Event Details' : 'New Event'} – {selectedDate}
-              </h2>
-              <button onClick={() => setDrawerOpen(false)}>✕</button>
+          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+            className="fixed top-0 right-0 w-full sm:w-96 h-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white p-6 shadow-xl overflow-y-auto z-50">
+            <h2 className="text-xl font-semibold mb-4">{editMode ? 'Edit Event' : 'Create Event'}</h2>
+            <input className="w-full border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:text-white"
+              placeholder="Title" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+            <textarea className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white"
+              placeholder="Description" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+            <input type="date" className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white"
+              value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
+            <div className="flex space-x-2 mt-2">
+              <input type="time" className="w-full border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:text-white"
+                value={formData.start_time} onChange={e => setFormData({ ...formData, start_time: e.target.value })} />
+              <input type="time" className="w-full border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:text-white"
+                value={formData.end_time} onChange={e => setFormData({ ...formData, end_time: e.target.value })} />
             </div>
+            <select className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white"
+              value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
+              {Object.keys(CATEGORY_COLORS).map(cat => (
+                <option
+                  key={cat}
+                  value={cat}
+                  disabled={isMember && (cat === 'Meeting' || cat === 'Workshop')}
+                >
+                  {cat}
+                </option>
+              ))}
+            </select>
+            <select className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white"
+              value={formData.recurrence} onChange={e => setFormData({ ...formData, recurrence: e.target.value })}>
+              {RECURRENCE_OPTIONS.map(opt => (
+                <option key={opt}>{opt}</option>
+              ))}
+            </select>
+            <label className="flex items-center space-x-2 mt-2">
+              <input type="checkbox" checked={formData.reminder}
+                onChange={e => setFormData({ ...formData, reminder: e.target.checked })} />
+              <span>Set Reminder</span>
+            </label>
 
-            {editMode && (
-              <div className="flex justify-end px-6 pt-2">
-                <button onClick={() => setShowDetails(true)} className="text-sm text-blue-600 hover:underline">View Event Details</button>
-              </div>
+            {formData.category === 'Meeting' && formData.meeting_url && !isMember && (
+              <a
+                href={`/meeting/${formData.meeting_url.split('/').pop()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline mt-4 block"
+              >
+                🔗 Open Meeting Room
+              </a>
             )}
 
-            <form onSubmit={e => { e.preventDefault(); saveEvent(); }} className="p-6 space-y-4">
-              <input type="text" className="w-full p-2 rounded border dark:bg-gray-800 dark:text-white dark:border-gray-700" placeholder="Event Title"
-                value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
-              <textarea className="w-full p-2 rounded border dark:bg-gray-800 dark:text-white dark:border-gray-700" placeholder="Description"
-                value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
-              <div className="flex gap-2">
-                <input type="time" className="flex-1 p-2 rounded border dark:bg-gray-800 dark:text-white dark:border-gray-700"
-                  value={formData.start_time} onChange={e => setFormData({ ...formData, start_time: e.target.value })} />
-                <input type="time" className="flex-1 p-2 rounded border dark:bg-gray-800 dark:text-white dark:border-gray-700"
-                  value={formData.end_time} onChange={e => setFormData({ ...formData, end_time: e.target.value })} />
-              </div>
-              <select className="w-full p-2 rounded border dark:bg-gray-800 dark:text-white dark:border-gray-700"
-                value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
-                {Object.keys(CATEGORY_COLORS).map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-              <select className="w-full p-2 rounded border dark:bg-gray-800 dark:text-white dark:border-gray-700"
-                value={formData.recurrence} onChange={e => setFormData({ ...formData, recurrence: e.target.value })}>
-                {RECURRENCE_OPTIONS.map(opt => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-              <button type="submit" className="w-full p-2 rounded bg-blue-600 text-white font-semibold">
-                {editMode ? 'Update Event' : 'Create Event'}
-              </button>
-            </form>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Event Details Modal */}
-      <AnimatePresence>
-        {showDetails && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4"
-            onClick={() => setShowDetails(false)}
-          >
-            <div
-              onClick={e => e.stopPropagation()}
-              className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full space-y-2"
-            >
-              <h3 className="text-xl font-semibold mb-2 dark:bg-gray-800 dark:text-white">📅 Event Info</h3>
-              <p className="dark:bg-gray-800 dark:text-white"><strong>Title:</strong> {formData.title}</p>
-              <p className="dark:bg-gray-800 dark:text-white"><strong>Date:</strong> {formData.date}</p>
-              <p className="dark:bg-gray-800 dark:text-white"><strong>Time:</strong> {formData.start_time} – {formData.end_time}</p>
-              <p className="dark:bg-gray-800 dark:text-white"><strong>Category:</strong> {formData.category}</p>
-              <p className="dark:bg-gray-800 dark:text-white"><strong>Recurrence:</strong> {formData.recurrence}</p>
-              <p className="dark:bg-gray-800 dark:text-white"><strong>Description:</strong><br />{formData.description || '(none)'}</p>
-              <div className="text-right mt-4">
-                <button onClick={() => setShowDetails(false)} className="text-sm text-gray-600 dark:text-gray-300 hover:underline">Close</button>
-              </div>
+            <div className="flex justify-between mt-4">
+              <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={saveEvent}>Save</button>
+              {editMode && isOwner && (
+                <button className="px-4 py-2 bg-red-600 text-white rounded" onClick={deleteEvent}>Delete</button>
+              )}
+              <button className="px-4 py-2 bg-gray-300 dark:bg-gray-600 dark:text-white rounded"
+                onClick={() => setDrawerOpen(false)}>Cancel</button>
             </div>
           </motion.div>
         )}

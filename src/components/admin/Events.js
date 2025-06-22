@@ -38,7 +38,6 @@ const Events = () => {
     meeting_url: null,
   });
   const [search, setSearch] = useState('');
-  const [selectedDate, setSelectedDate] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [activeCategories, setActiveCategories] = useState(Object.keys(CATEGORY_COLORS));
@@ -46,12 +45,13 @@ const Events = () => {
   const calendarRef = useRef();
 
   const isAdmin = profile?.role === 'admin' || profile?.department === 'management';
+  const isMember = profile?.role === 'member' || profile?.department === 'members';
 
   useEffect(() => {
     if (user) {
       supabase
         .from('profiles')
-        .select('role, department')
+        .select('role, department, name')
         .eq('id', user.id)
         .single()
         .then(({ data }) => setProfile(data));
@@ -68,10 +68,11 @@ const Events = () => {
     const result = [];
     data.forEach(evt => {
       const color = CATEGORY_COLORS[evt.category] || '#6b7280';
+      const titleWithIcon = evt.meeting_url ? `${evt.title} 📹` : evt.title;
       const base = {
         id: evt.id,
         groupId: evt.id,
-        title: evt.title,
+        title: titleWithIcon,
         description: evt.description,
         backgroundColor: color,
         borderColor: '#00000020',
@@ -116,7 +117,7 @@ const Events = () => {
       date: info.dateStr,
       start_time: '09:00',
       end_time: '10:00',
-      category: 'Meeting',
+      category: isMember ? 'Personal' : 'Meeting',
       recurrence: 'None',
       reminder: false,
       meeting_url: null
@@ -129,7 +130,7 @@ const Events = () => {
   const handleEventClick = ({ event }) => {
     const isCreator = event.extendedProps.created_by === user?.id;
     setFormData({
-      title: event.title,
+      title: event.title.replace(' 📹', ''),
       description: event.extendedProps.description || '',
       id: event.id,
       date: format(event.start, 'yyyy-MM-dd'),
@@ -140,7 +141,6 @@ const Events = () => {
       reminder: false,
       meeting_url: event.extendedProps.meeting_url || null
     });
-    setSelectedDate(format(event.start, 'yyyy-MM-dd'));
     setEditMode(true);
     setIsOwner(isCreator || isAdmin);
     setDrawerOpen(true);
@@ -154,11 +154,15 @@ const Events = () => {
 
     if (!title.trim()) return toast.error('Title is required');
 
-    let meeting_url = null;
+    if (isMember && (category === 'Meeting' || category === 'Workshop')) {
+      return toast.error('You are not allowed to schedule Meetings or Workshops.');
+    }
 
-    if (category === 'Meeting' && isAdmin) {
-      const room = `meet-${Math.random().toString(36).substring(2, 8)}-${Date.now()}`;
-      meeting_url = `https://meet.jit.si/${room}`;
+    let meeting_url = formData.meeting_url;
+
+    if (category === 'Meeting' && isAdmin && !editMode) {
+      const room = `mks-${Math.random().toString(36).substring(2, 6)}-${Date.now()}`;
+      meeting_url = `https://ju-makerspace-meet.duckdns.org/${room}`;
     }
 
     const payload = {
@@ -182,7 +186,7 @@ const Events = () => {
       const { error } = await supabase.from('events').insert([payload]);
       if (error) return toast.error('Failed to create event');
       toast.success('Event created');
-      if (meeting_url) window.open(meeting_url, '_blank');
+      if (meeting_url) window.open(`/meeting/${meeting_url.split('/').pop()}`, '_blank');
     }
 
     setDrawerOpen(false);
@@ -203,20 +207,14 @@ const Events = () => {
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
       {/* Sidebar */}
-      <div className="hidden sm:block w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4">
+      <div className="hidden sm:block w-64 bg-white dark:bg-gray-800 border-r p-4">
         <h2 className="text-lg font-bold mb-3">Filters</h2>
-        <input
-          type="text"
-          placeholder="Search events..."
-          value={search}
+        <input type="text" placeholder="Search events..." value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full mb-3 px-2 py-1 border rounded bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600"
-        />
+          className="w-full mb-3 px-2 py-1 border rounded bg-white dark:bg-gray-700 dark:text-white" />
         {Object.entries(CATEGORY_COLORS).map(([cat, color]) => (
           <label key={cat} className="flex items-center space-x-2 mb-2">
-            <input
-              type="checkbox"
-              checked={activeCategories.includes(cat)}
+            <input type="checkbox" checked={activeCategories.includes(cat)}
               onChange={() =>
                 setActiveCategories(prev =>
                   prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
@@ -228,11 +226,7 @@ const Events = () => {
           </label>
         ))}
         <label className="flex items-center space-x-2 mt-2">
-          <input
-            type="checkbox"
-            checked={showOnlyMine}
-            onChange={() => setShowOnlyMine(prev => !prev)}
-          />
+          <input type="checkbox" checked={showOnlyMine} onChange={() => setShowOnlyMine(prev => !prev)} />
           <span>My events only</span>
         </label>
       </div>
@@ -243,11 +237,7 @@ const Events = () => {
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
-          }}
+          headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
           events={events.filter(e =>
             activeCategories.includes(e.category) &&
             (!showOnlyMine || e.created_by === user?.id) &&
@@ -271,25 +261,31 @@ const Events = () => {
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
             className="fixed top-0 right-0 w-full sm:w-96 h-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white p-6 shadow-xl overflow-y-auto z-50">
             <h2 className="text-xl font-semibold mb-4">{editMode ? 'Edit Event' : 'Create Event'}</h2>
-            <input className="w-full border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600"
+            <input className="w-full border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:text-white"
               placeholder="Title" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
-            <textarea className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600"
+            <textarea className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white"
               placeholder="Description" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
-            <input type="date" className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600"
+            <input type="date" className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white"
               value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
             <div className="flex space-x-2 mt-2">
-              <input type="time" className="w-full border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600"
+              <input type="time" className="w-full border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:text-white"
                 value={formData.start_time} onChange={e => setFormData({ ...formData, start_time: e.target.value })} />
-              <input type="time" className="w-full border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600"
+              <input type="time" className="w-full border px-2 py-1 rounded bg-white dark:bg-gray-700 dark:text-white"
                 value={formData.end_time} onChange={e => setFormData({ ...formData, end_time: e.target.value })} />
             </div>
-            <select className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600"
+            <select className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white"
               value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
               {Object.keys(CATEGORY_COLORS).map(cat => (
-                <option key={cat}>{cat}</option>
+                <option
+                  key={cat}
+                  value={cat}
+                  disabled={isMember && (cat === 'Meeting' || cat === 'Workshop')}
+                >
+                  {cat}
+                </option>
               ))}
             </select>
-            <select className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600"
+            <select className="w-full border px-2 py-1 mt-2 rounded bg-white dark:bg-gray-700 dark:text-white"
               value={formData.recurrence} onChange={e => setFormData({ ...formData, recurrence: e.target.value })}>
               {RECURRENCE_OPTIONS.map(opt => (
                 <option key={opt}>{opt}</option>
@@ -300,11 +296,18 @@ const Events = () => {
                 onChange={e => setFormData({ ...formData, reminder: e.target.checked })} />
               <span>Set Reminder</span>
             </label>
-            {formData.meeting_url && (
-              <a href={formData.meeting_url} target="_blank" rel="noopener noreferrer" className="block mt-2 text-blue-500 underline">
-                Join Meeting
+
+            {formData.category === 'Meeting' && formData.meeting_url && !isMember && (
+              <a
+                href={`/meeting/${formData.meeting_url.split('/').pop()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline mt-4 block"
+              >
+                🔗 Open Meeting Room
               </a>
             )}
+
             <div className="flex justify-between mt-4">
               <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={saveEvent}>Save</button>
               {editMode && isOwner && (
