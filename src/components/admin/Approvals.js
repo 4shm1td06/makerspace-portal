@@ -6,6 +6,7 @@ const Approvals = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Function to fetch pending projects from the database
   const fetchPendingProjects = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -24,27 +25,31 @@ const Approvals = () => {
     setLoading(false);
   };
 
+  // Function to handle the decision (approve or reject)
+
   const handleDecision = async (id, status) => {
-    const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-    const { error } = await supabase
-      .from('projects')
-      .update({
-        status,
-        approved_by: user.id,
-        approved_at: new Date().toISOString(),
-      })
-      .eq('id', id);
+  const { error } = await supabase
+    .from('projects')
+    .update({
+      status,
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', id);
 
-    if (error) {
-      toast.error('Failed to update project status');
-      console.error(error);
-    } else {
-      toast.success(`Project ${status}`);
-      setProjects((prev) => prev.filter((p) => p.id !== id));
-    }
-  };
+  if (error) {
+    toast.error('Failed to update project status');
+    console.error(error);
+  } else {
+    toast.success(`Project ${status}`);
+    // The key fix: Re-fetch the data from Supabase.
+    fetchPendingProjects();
+  }
+};
 
+  // useEffect hook to fetch data on component mount
   useEffect(() => {
     fetchPendingProjects();
   }, []);

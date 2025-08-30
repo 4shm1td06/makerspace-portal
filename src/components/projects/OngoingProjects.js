@@ -2,29 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { toast } from 'react-toastify';
 
 const OngoingProjects = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState(null);
-  const [editedDescription, setEditedDescription] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
-  const [currentUserEmail, setCurrentUserEmail] = useState(null);
+  const [profiles, setProfiles] = useState([]);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [sending, setSending] = useState(false);
 
-  // Fetch current logged-in user
-  const fetchUser = async () => {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (user) {
-      setCurrentUserEmail(user.email);
-    } else if (error) {
-      console.error('Failed to get user:', error.message);
-    }
-  };
-
+  // ✅ Fetch Ongoing Projects
   const fetchProjects = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -36,58 +25,103 @@ const OngoingProjects = () => {
     if (error) {
       console.error('Error fetching projects:', error);
     } else {
-      setProjects(data);
+      // ✅ Parse Collab_requests to ensure it's always an array
+      const formatted = data.map((p) => ({
+        ...p,
+        Collab_requests: p.Collab_requests
+          ? Array.isArray(p.Collab_requests)
+            ? p.Collab_requests
+            : JSON.parse(p.Collab_requests)
+          : [],
+      }));
+      setProjects(formatted);
     }
     setLoading(false);
   };
 
-  const updateDescription = async (id) => {
-    const { error } = await supabase
-      .from('projects')
-      .update({ description: editedDescription })
-      .eq('id', id);
+  // ✅ Fetch All Profiles (Collaborators including Admin)
+  const fetchProfiles = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, email, role')
+      .order('name', { ascending: true });
 
     if (error) {
-      alert('Failed to update description: ' + error.message);
+      console.error('Error fetching profiles:', error);
     } else {
-      setEditingId(null);
-      setEditedDescription('');
-      fetchProjects();
+      setProfiles(data);
     }
   };
 
+  // ✅ Open Modal for Selected Project
   const handleCollaborators = (project) => {
     setSelectedProject(project);
     setShowModal(true);
   };
 
-  useEffect(() => {
-    fetchProjects();
-    fetchUser();
+  // ✅ Send Collaboration Request & Notification
+  const sendCollaborationRequest = async () => {
+    if (!selectedProfile) {
+      toast.error('Please select a collaborator.');
+      return;
+    }
 
-    const subscription = supabase
-      .channel('realtime-projects')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'projects',
-        },
-        () => {
-          fetchProjects();
-        }
-      )
-      .subscribe();
+    setSending(true);
 
-    return () => {
-      supabase.removeChannel(subscription);
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      toast.error('Failed to fetch user info.');
+      setSending(false);
+      return;
+    }
+
+    const newRequest = {
+      project_id: selectedProject.id,
+      requester_email: user.email,
+      collaborator_email: selectedProfile.email,
+      collaborator_name: selectedProfile.name,
+      status: 'pending',
     };
-  }, []);
 
+    const updatedRequests = [...(selectedProject.Collab_requests ?? []), newRequest];
+
+    // ✅ Update Project Collab Requests
+    const { error } = await supabase
+      .from('projects')
+      .update({
+        Collab_requests: updatedRequests,
+      })
+      .eq('id', selectedProject.id);
+
+    if (error) {
+      toast.error('Failed to send collaboration request: ' + error.message);
+      setSending(false);
+      return;
+    }
+
+    // ✅ Insert Notification for Collaborator
+    await supabase.from('notifications').insert([
+      {
+        user_id: selectedProfile.id,
+        type: 'collaboration_request',
+        message: `${user.email} invited you to collaborate on project "${selectedProject.title}".`,
+        status: 'pending',
+      },
+    ]);
+
+    toast.success('Collaboration request sent for approval!');
+    setShowModal(false);
+    setSelectedProfile(null);
+    setSending(false);
+  };
+
+  // ✅ Export Projects to PDF
   const exportToPDF = () => {
     const doc = new jsPDF();
-    doc.text('Ongoing Projects', 14, 16);
+    doc.setFontSize(18);
+    doc.text('Ongoing Projects Report', 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
 
     const tableData = projects.map((project, index) => [
       index + 1,
@@ -100,20 +134,42 @@ const OngoingProjects = () => {
     doc.autoTable({
       head: [['#', 'Title', 'Description', 'Status', 'Created At']],
       body: tableData,
-      startY: 20,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [52, 73, 94] },
+      startY: 28,
+      styles: { fontSize: 9, cellWidth: 'wrap' },
+      columnStyles: { 2: { cellWidth: 70 } },
+      headStyles: { fillColor: [52, 73, 94], textColor: [255, 255, 255] },
+      didDrawPage: (data) => {
+        doc.setFontSize(8);
+        doc.text(
+          `Page ${doc.internal.getNumberOfPages()}`,
+          data.settings.margin.left,
+          doc.internal.pageSize.height - 10
+        );
+      },
     });
 
     doc.save('ongoing-projects.pdf');
   };
 
+  // ✅ Fetch Projects & Profiles + Realtime Updates
+  useEffect(() => {
+    fetchProjects();
+    fetchProfiles();
+
+    const subscription = supabase
+      .channel('realtime-projects')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, fetchProjects)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, []);
+
   return (
     <section className="mt-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Ongoing Projects
-        </h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Ongoing Projects</h2>
         <button
           onClick={exportToPDF}
           className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition"
@@ -133,51 +189,11 @@ const OngoingProjects = () => {
               key={project.id}
               className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 p-5 transition hover:shadow-lg"
             >
-              {/* Edit Description Button */}
-              <button
-                className="absolute top-3 right-3 bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700"
-                onClick={() => {
-                  setEditingId(project.id);
-                  setEditedDescription(project.description || '');
-                }}
-              >
-                Edit Description
-              </button>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-1">{project.title}</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                {project.description || 'No description provided.'}
+              </p>
 
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-1">
-                {project.title}
-              </h3>
-
-              {editingId === project.id ? (
-                <>
-                  <textarea
-                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm text-gray-800 dark:text-white dark:bg-gray-700 mt-2"
-                    value={editedDescription}
-                    onChange={(e) => setEditedDescription(e.target.value)}
-                    rows={3}
-                  />
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={() => updateDescription(project.id)}
-                      className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="px-3 py-1 bg-gray-400 text-white rounded text-sm hover:bg-gray-500"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                  {project.description || 'No description provided.'}
-                </p>
-              )}
-
-              {/* Collaborators Button */}
               <button
                 onClick={() => handleCollaborators(project)}
                 className="mt-1 mb-3 px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
@@ -199,30 +215,59 @@ const OngoingProjects = () => {
         </div>
       )}
 
-      {/* Modal */}
+      {/* ✅ Collaborators Modal */}
       {showModal && selectedProject && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md shadow-lg relative">
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-lg shadow-lg relative">
             <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
               Collaborators – {selectedProject.title}
             </h3>
 
-            <div className="mb-4 text-sm text-gray-700 dark:text-gray-300">
-              <p><strong>Members:</strong></p>
-              <ul className="list-disc list-inside pl-2 mt-2">
-                {currentUserEmail ? (
-                  <li>{currentUserEmail} <span className="text-green-600 font-semibold">(Admin)</span></li>
-                ) : (
-                  <li>Loading user...</li>
-                )}
+            {selectedProject.Collab_requests && selectedProject.Collab_requests.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Existing Requests:
+                </h4>
+                <ul className="text-sm text-gray-600 dark:text-gray-300 border rounded p-2 max-h-32 overflow-y-auto">
+                  {selectedProject.Collab_requests.map((req, i) => (
+                    <li key={i} className="border-b py-1">
+                      {req.collaborator_name} ({req.collaborator_email}) –{' '}
+                      <span className="capitalize">{req.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Select Collaborator:
+              </h4>
+              <ul className="text-sm text-gray-600 dark:text-gray-300 border rounded p-2 max-h-48 overflow-y-auto">
+                {profiles.map((profile) => (
+                  <li
+                    key={profile.id}
+                    onClick={() => setSelectedProfile(profile)}
+                    className={`p-2 rounded cursor-pointer ${
+                      selectedProfile?.id === profile.id
+                        ? 'bg-green-100 dark:bg-green-800'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <strong>{profile.name}</strong> – {profile.email} ({profile.role})
+                  </li>
+                ))}
               </ul>
             </div>
 
             <button
-              className="w-full mb-3 bg-green-600 text-white py-2 rounded hover:bg-green-700 text-sm"
-              onClick={() => alert('Invite form coming soon')}
+              className={`w-full mb-3 ${
+                sending ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'
+              } text-white py-2 rounded text-sm`}
+              onClick={sendCollaborationRequest}
+              disabled={sending || !selectedProfile}
             >
-              Invite Members
+              {sending ? 'Sending...' : 'Send Request'}
             </button>
 
             <button

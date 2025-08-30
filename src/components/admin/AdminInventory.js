@@ -4,39 +4,75 @@ import { toast } from 'react-toastify';
 
 const AdminInventory = () => {
   const [items, setItems] = useState([]);
+  const [supplyRequests, setSupplyRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingRequests, setLoadingRequests] = useState(true);
   const [editingItem, setEditingItem] = useState(null);
   const [newItem, setNewItem] = useState({ name: '', category: '', quantity: 0 });
 
   const fetchInventory = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error('Failed to load inventory');
-      console.error(error);
+    
+    // Fetch from both inventory and add_item tables
+    const [inventoryResult, addItemResult] = await Promise.all([
+      supabase.from('inventory').select('*').order('created_at', { ascending: false }),
+      supabase.from('add_item').select('*').order('created_at', { ascending: false })
+    ]);
+    
+    const inventoryData = inventoryResult.data || [];
+    const addItemData = addItemResult.data || [];
+    
+    // Combine both datasets, marking source
+    const combinedData = [
+      ...inventoryData.map(item => ({ ...item, source: 'inventory' })),
+      ...addItemData.map(item => ({ ...item, source: 'add_item' }))
+    ];
+    
+    // Sort by created_at descending
+    combinedData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    if (inventoryResult.error && addItemResult.error) {
+      toast.error('Failed to load inventory data');
+      console.error('Inventory error:', inventoryResult.error);
+      console.error('Add_item error:', addItemResult.error);
     } else {
-      setItems(data);
+      setItems(combinedData);
     }
+    
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchInventory();
-  }, []);
+  const fetchSupplyRequests = async () => {
+    setLoadingRequests(true);
+    const { data, error } = await supabase
+      .from('supply_requests')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      toast.error('Failed to load supply requests');
+      console.error(error);
+    } else {
+      setSupplyRequests(data);
+    }
+    setLoadingRequests(false);
+  };
+
 
   const handleAddItem = async () => {
     const { name, category, quantity } = newItem;
     if (!name || !category) return toast.error('All fields are required');
 
-    const { error } = await supabase.from('inventory').insert([{ name, category, quantity }]);
+    console.log('Attempting to add item:', { name, category, quantity });
+    
+    const { data, error } = await supabase.from('add_item').insert([{ name, category, quantity }]);
     if (error) {
-      toast.error('Failed to add item');
+      toast.error(`Failed to add item: ${error.message}`);
+      console.error('Supabase error:', error);
     } else {
-      toast.success('Item added');
+      toast.success('Item added successfully');
+      console.log('Item added to add_item table:', data);
       setNewItem({ name: '', category: '', quantity: 0 });
       fetchInventory();
     }
@@ -68,20 +104,68 @@ const AdminInventory = () => {
     }
   };
 
+  const handleApproveSupply = async (request) => {
+    const { id, item_name, category, quantity, unit } = request;
+
+    // Use upsert to either update an existing item or insert a new one
+    const { error: inventoryError } = await supabase
+      .from('inventory')
+      .upsert(
+        { name: item_name, category, quantity, unit },
+        { onConflict: 'name', ignoreDuplicates: false }
+      );
+
+    if (inventoryError) {
+      toast.error('Failed to update/add item to inventory');
+      console.error(inventoryError);
+      return;
+    }
+
+    const { error: requestError } = await supabase
+      .from('supply_requests')
+      .update({ status: 'approved' })
+      .eq('id', id);
+
+    if (requestError) {
+      toast.error('Failed to update request status');
+      console.error(requestError);
+    } else {
+      toast.success(`Approved: ${item_name} added to inventory`);
+      fetchInventory();
+      fetchSupplyRequests();
+    }
+  };
+
+  const handleRejectSupply = async (id) => {
+    const { error } = await supabase.from('supply_requests').update({ status: 'rejected' }).eq('id', id);
+
+    if (error) {
+      toast.error('Failed to reject request');
+      console.error(error);
+    } else {
+      toast.success('Request rejected');
+      fetchSupplyRequests();
+    }
+  };
+
   const getStatus = (qty) => {
     if (qty === 0) return { label: 'Out of Stock', color: 'bg-red-100 text-red-800' };
     if (qty < 5) return { label: 'Low Stock', color: 'bg-yellow-100 text-yellow-800' };
     return { label: 'In Stock', color: 'bg-green-100 text-green-800' };
   };
 
-  if (loading) return <div className="p-4">Loading inventory...</div>;
-  if (items.length === 0) return <div className="p-4">No inventory found</div>;
+  useEffect(() => {
+    fetchInventory();
+    fetchSupplyRequests();
+  }, []);
+
+  if (loading || loadingRequests) return <div className="p-4">Loading inventory...</div>;
 
   return (
     <div className="p-4 space-y-6">
       <h2 className="text-xl font-semibold">Inventory Management</h2>
 
-      {/* Add Item */}
+      {/* 1. Add Item Section */}
       <div className="space-y-2">
         <h3 className="font-medium">Add New Item</h3>
         <div className="flex gap-2 flex-wrap">
@@ -115,53 +199,87 @@ const AdminInventory = () => {
         </div>
       </div>
 
-      {/* Inventory Table */}
-      <table className="w-full table-auto border-collapse border border-gray-300 dark:border-gray-600">
-        <thead>
-          <tr className="bg-gray-200 dark:bg-gray-700">
-            <th className="border p-2 text-left">Name</th>
-            <th className="border p-2">Category</th>
-            <th className="border p-2">Quantity</th>
-            <th className="border p-2">Status</th>
-            <th className="border p-2">Created</th>
-            <th className="border p-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map(({ id, item_name, category, quantity, created_at }) => {
-            const status = getStatus(quantity);
-            return (
-              <tr key={id} className="hover:bg-gray-100 dark:hover:bg-gray-800">
-                <td className="border p-2">{item_name}</td>
-                <td className="border p-2 text-center">{category}</td>
-                <td className="border p-2 text-center">{quantity}</td>
-                <td className="border p-2 text-center">
-                  <span className={`px-2 py-1 rounded-full text-sm font-medium ${status.color}`}>
-                    {status.label}
-                  </span>
-                </td>
-                <td className="border p-2">{new Date(created_at).toLocaleString()}</td>
-                <td className="border p-2 text-center space-x-2">
-                  <button
-                    onClick={() =>
-                      setEditingItem({ id, item_name, category, quantity: Number(quantity) })
-                    }
-                    className="bg-yellow-400 hover:bg-yellow-500 text-white px-3 py-1 rounded"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(id)}
-                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      {/* 2. Supply Approvals Section */}
+      {supplyRequests.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="font-medium">Pending Supply Requests ({supplyRequests.length})</h3>
+          {supplyRequests.map((request) => (
+            <div key={request.id} className="p-4 border rounded-lg shadow-sm dark:bg-gray-800">
+              <p className="font-semibold">{request.item_name}</p>
+              <p>Category: {request.category}</p>
+              <p>Quantity: {request.quantity}</p>
+              <p>Unit: {request.unit}</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => handleApproveSupply(request)}
+                  className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded"
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => handleRejectSupply(request.id)}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 3. Inventory Table */}
+      <h3 className="text-lg font-medium">Current Inventory</h3>
+      {items.length === 0 ? (
+        <div className="p-4">No inventory found</div>
+      ) : (
+        <table className="w-full table-auto border-collapse border border-gray-300 dark:border-gray-600">
+          <thead>
+            <tr className="bg-gray-200 dark:bg-gray-700">
+              <th className="border p-2 text-left">Name</th>
+              <th className="border p-2">Category</th>
+              <th className="border p-2">Quantity</th>
+              <th className="border p-2">Status</th>
+              <th className="border p-2">Created</th>
+              <th className="border p-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map(({ id, name, category, quantity, created_at }) => {
+              const status = getStatus(quantity);
+              return (
+                <tr key={id} className="hover:bg-gray-100 dark:hover:bg-gray-800">
+                  <td className="border p-2">{name}</td>
+                  <td className="border p-2 text-center">{category}</td>
+                  <td className="border p-2 text-center">{quantity}</td>
+                  <td className="border p-2 text-center">
+                    <span className={`px-2 py-1 rounded-full text-sm font-medium ${status.color}`}>
+                      {status.label}
+                    </span>
+                  </td>
+                  <td className="border p-2">{new Date(created_at).toLocaleString()}</td>
+                  <td className="border p-2 text-center space-x-2">
+                    <button
+                      onClick={() =>
+                        setEditingItem({ id, name, category, quantity: Number(quantity) })
+                      }
+                      className="bg-yellow-400 hover:bg-yellow-500 text-white px-3 py-1 rounded"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(id)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
 
       {/* Edit Form */}
       {editingItem && (

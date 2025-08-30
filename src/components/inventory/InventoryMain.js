@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import InventoryList from './InventoryList';
 import SupplyRequest from './SupplyRequest';
-import RegisterSupply from './RegisterSupply';
 import BillSubmission from './BillSubmission';
 
 const InventoryMain = () => {
@@ -25,12 +24,6 @@ const InventoryMain = () => {
         <div className="bg-white dark:bg-gray-800 shadow-md dark:shadow-gray-700 rounded-2xl p-5">
           <h2 className="text-xl font-semibold mb-4">Request Supplies</h2>
           <SupplyRequest />
-        </div>
-
-        {/* Register Supply Card */}
-        <div className="bg-white dark:bg-gray-800 shadow-md dark:shadow-gray-700 rounded-2xl p-5">
-          <h2 className="text-xl font-semibold mb-4">Register New Supply</h2>
-          <RegisterSupply />
         </div>
 
         {/* Bill Submission Card */}

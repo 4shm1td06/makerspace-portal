@@ -12,7 +12,7 @@ const loginSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-const backgroundImages = ["/bg1.png", "/bg2.jpg", "/bg3.jpg"];
+const backgroundImages = ["/bg1.jpg", "1.jpeg", "2.jpeg", "3.jpeg", "4.jpeg"];
 
 export default function Login() {
   const navigate = useNavigate();
