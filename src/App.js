@@ -38,6 +38,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import ToolsProtectedRoute from './components/admin/ToolsProtectedRoute';
 
 import MeetingRoom from './components/meeting/MeetingRoom';
+import AdminProjectDetail from './components/admin/AdminProjectDetail';
 
 
 function App() {
@@ -172,6 +173,7 @@ function App() {
 
               <Route index element={<Navigate to="/login" replace />} />
               <Route path="*" element={<Navigate to={user ? (role === 'admin' ? '/admin/dashboard' : '/dashboard') : '/login'} replace />} />
+              <Route path="/admin/adminprojects/:id" element={<ProtectedRoute requireAdmin={true}> <AdminProjectDetail /> </ProtectedRoute>}/>
             </Routes>
           </main>
 
