@@ -36,7 +36,7 @@ export default function Register() {
   const onSubmit = async ({ email, password }) => {
     setLoading(true);
     try {
-      const res = await axios.post("http://mks-smtp.vercel.app/api/request-registration", {
+      const res = await axios.post("https://mks-smtp.vercel.app/api/request-registration", {
         email,
         password,
       });
@@ -65,7 +65,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const res = await axios.post("http://mks-smtp.vercel.app/api/verify-otp", {
+      const res = await axios.post("https://mks-smtp.vercel.app/api/verify-otp", {
         email,
         otp: enteredOtp,
         password,
@@ -161,4 +161,5 @@ export default function Register() {
       </div>
     </div>
   );
+
 }
