@@ -8,40 +8,26 @@ const AdminInventory = () => {
   const [loading, setLoading] = useState(true);
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [editingItem, setEditingItem] = useState(null);
-  const [newItem, setNewItem] = useState({ name: '', category: '', quantity: 0 });
+  const [newItem, setNewItem] = useState({ item_name: '', category: '', quantity: 0 });
 
+  // Fetch inventory
   const fetchInventory = async () => {
     setLoading(true);
-    
-    // Fetch from both inventory and add_item tables
-    const [inventoryResult, addItemResult] = await Promise.all([
-      supabase.from('inventory').select('*').order('created_at', { ascending: false }),
-      supabase.from('add_item').select('*').order('created_at', { ascending: false })
-    ]);
-    
-    const inventoryData = inventoryResult.data || [];
-    const addItemData = addItemResult.data || [];
-    
-    // Combine both datasets, marking source
-    const combinedData = [
-      ...inventoryData.map(item => ({ ...item, source: 'inventory' })),
-      ...addItemData.map(item => ({ ...item, source: 'add_item' }))
-    ];
-    
-    // Sort by created_at descending
-    combinedData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    
-    if (inventoryResult.error && addItemResult.error) {
-      toast.error('Failed to load inventory data');
-      console.error('Inventory error:', inventoryResult.error);
-      console.error('Add_item error:', addItemResult.error);
+    const { data: inventoryData, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      toast.error('Failed to load inventory');
+      console.error(error);
     } else {
-      setItems(combinedData);
+      setItems(inventoryData || []);
     }
-    
     setLoading(false);
   };
 
+  // Fetch pending supply requests
   const fetchSupplyRequests = async () => {
     setLoadingRequests(true);
     const { data, error } = await supabase
@@ -54,30 +40,31 @@ const AdminInventory = () => {
       toast.error('Failed to load supply requests');
       console.error(error);
     } else {
-      setSupplyRequests(data);
+      setSupplyRequests(data || []);
     }
     setLoadingRequests(false);
   };
 
-
+  // Add new item
   const handleAddItem = async () => {
-    const { name, category, quantity } = newItem;
-    if (!name || !category) return toast.error('All fields are required');
+    const { item_name, category, quantity } = newItem;
+    if (!item_name || !category) return toast.error('All fields are required');
 
-    console.log('Attempting to add item:', { name, category, quantity });
-    
-    const { data, error } = await supabase.from('add_item').insert([{ name, category, quantity }]);
+    const { error } = await supabase
+      .from('inventory')
+      .insert([{ item_name, category, quantity }]);
+
     if (error) {
       toast.error(`Failed to add item: ${error.message}`);
-      console.error('Supabase error:', error);
+      console.error(error);
     } else {
       toast.success('Item added successfully');
-      console.log('Item added to add_item table:', data);
-      setNewItem({ name: '', category: '', quantity: 0 });
+      setNewItem({ item_name: '', category: '', quantity: 0 });
       fetchInventory();
     }
   };
 
+  // Delete item
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     const { error } = await supabase.from('inventory').delete().eq('id', id);
@@ -89,12 +76,14 @@ const AdminInventory = () => {
     }
   };
 
+  // Edit item
   const handleEdit = async () => {
-    const { id, name, category, quantity } = editingItem;
+    const { id, item_name, category, quantity } = editingItem;
     const { error } = await supabase
       .from('inventory')
-      .update({ name, category, quantity })
+      .update({ item_name, category, quantity })
       .eq('id', id);
+
     if (error) {
       toast.error('Update failed');
     } else {
@@ -104,44 +93,63 @@ const AdminInventory = () => {
     }
   };
 
+  // Approve supply request
   const handleApproveSupply = async (request) => {
-    const { id, item_name, category, quantity, unit } = request;
+    const { id, item_name, quantity, unit } = request;
 
-    // Use upsert to either update an existing item or insert a new one
-    const { error: inventoryError } = await supabase
-      .from('inventory')
-      .upsert(
-        { name: item_name, category, quantity, unit },
-        { onConflict: 'name', ignoreDuplicates: false }
-      );
+    try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
 
-    if (inventoryError) {
-      toast.error('Failed to update/add item to inventory');
-      console.error(inventoryError);
-      return;
-    }
+      // Fetch inventory item
+      const { data: existing, error: fetchError } = await supabase
+        .from('inventory')
+        .select('id, quantity')
+        .eq('item_name', item_name)
+        .single();
 
-    const { error: requestError } = await supabase
-      .from('supply_requests')
-      .update({ status: 'approved' })
-      .eq('id', id);
+      if (fetchError) throw fetchError;
+      if (!existing) return toast.error('Item not found in inventory');
 
-    if (requestError) {
-      toast.error('Failed to update request status');
-      console.error(requestError);
-    } else {
-      toast.success(`Approved: ${item_name} added to inventory`);
+      if (existing.quantity < quantity) {
+        return toast.error('Not enough stock to fulfill this request');
+      }
+
+      // Subtract quantity
+      const { error: updateError } = await supabase
+        .from('inventory')
+        .update({ quantity: existing.quantity - quantity })
+        .eq('id', existing.id);
+
+      if (updateError) throw updateError;
+
+      // Update supply request as fulfilled
+      const { error: requestError } = await supabase
+        .from('supply_requests')
+        .update({ status: 'fulfilled', approved_by: user.id, approved_at: new Date() })
+        .eq('id', id);
+
+      if (requestError) throw requestError;
+
+      toast.success(`${quantity} ${unit} of ${item_name} approved.`);
       fetchInventory();
       fetchSupplyRequests();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to approve supply request');
     }
   };
 
+  // Reject supply request
   const handleRejectSupply = async (id) => {
-    const { error } = await supabase.from('supply_requests').update({ status: 'rejected' }).eq('id', id);
+    const { error } = await supabase
+      .from('supply_requests')
+      .update({ status: 'rejected' })
+      .eq('id', id);
 
     if (error) {
       toast.error('Failed to reject request');
-      console.error(error);
     } else {
       toast.success('Request rejected');
       fetchSupplyRequests();
@@ -165,15 +173,15 @@ const AdminInventory = () => {
     <div className="p-4 space-y-6">
       <h2 className="text-xl font-semibold">Inventory Management</h2>
 
-      {/* 1. Add Item Section */}
+      {/* Add New Item */}
       <div className="space-y-2">
         <h3 className="font-medium">Add New Item</h3>
         <div className="flex gap-2 flex-wrap">
           <input
             className="border p-2 rounded dark:bg-gray-800 dark:text-white"
             placeholder="Name"
-            value={newItem.name}
-            onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+            value={newItem.item_name}
+            onChange={(e) => setNewItem({ ...newItem, item_name: e.target.value })}
           />
           <input
             className="border p-2 rounded dark:bg-gray-800 dark:text-white"
@@ -199,7 +207,7 @@ const AdminInventory = () => {
         </div>
       </div>
 
-      {/* 2. Supply Approvals Section */}
+      {/* Pending Supply Requests */}
       {supplyRequests.length > 0 && (
         <div className="space-y-4">
           <h3 className="font-medium">Pending Supply Requests ({supplyRequests.length})</h3>
@@ -228,7 +236,7 @@ const AdminInventory = () => {
         </div>
       )}
 
-      {/* 3. Inventory Table */}
+      {/* Inventory Table */}
       <h3 className="text-lg font-medium">Current Inventory</h3>
       {items.length === 0 ? (
         <div className="p-4">No inventory found</div>
@@ -245,11 +253,11 @@ const AdminInventory = () => {
             </tr>
           </thead>
           <tbody>
-            {items.map(({ id, name, category, quantity, created_at }) => {
+            {items.map(({ id, item_name, category, quantity, created_at }) => {
               const status = getStatus(quantity);
               return (
                 <tr key={id} className="hover:bg-gray-100 dark:hover:bg-gray-800">
-                  <td className="border p-2">{name}</td>
+                  <td className="border p-2">{item_name}</td>
                   <td className="border p-2 text-center">{category}</td>
                   <td className="border p-2 text-center">{quantity}</td>
                   <td className="border p-2 text-center">
@@ -261,7 +269,7 @@ const AdminInventory = () => {
                   <td className="border p-2 text-center space-x-2">
                     <button
                       onClick={() =>
-                        setEditingItem({ id, name, category, quantity: Number(quantity) })
+                        setEditingItem({ id, item_name, category, quantity: Number(quantity) })
                       }
                       className="bg-yellow-400 hover:bg-yellow-500 text-white px-3 py-1 rounded"
                     >
@@ -289,18 +297,14 @@ const AdminInventory = () => {
             <input
               className="border p-2 rounded"
               placeholder="Name"
-              value={editingItem.name}
-              onChange={(e) =>
-                setEditingItem({ ...editingItem, name: e.target.value })
-              }
+              value={editingItem.item_name}
+              onChange={(e) => setEditingItem({ ...editingItem, item_name: e.target.value })}
             />
             <input
               className="border p-2 rounded"
               placeholder="Category"
               value={editingItem.category}
-              onChange={(e) =>
-                setEditingItem({ ...editingItem, category: e.target.value })
-              }
+              onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
             />
             <input
               className="border p-2 rounded"
@@ -308,10 +312,7 @@ const AdminInventory = () => {
               placeholder="Quantity"
               value={editingItem.quantity}
               onChange={(e) =>
-                setEditingItem({
-                  ...editingItem,
-                  quantity: Math.max(0, Number(e.target.value)),
-                })
+                setEditingItem({ ...editingItem, quantity: Math.max(0, Number(e.target.value)) })
               }
             />
             <button

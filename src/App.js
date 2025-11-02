@@ -33,13 +33,15 @@ import Events from './components/admin/Events';
 import News from './components/admin/news';
 import LiveUsersList from './components/admin/LiveUsersList';
 
-import './styles/globals.css';
-import { NotificationProvider } from './context/NotificationContext';
-import ToolsProtectedRoute from './components/admin/ToolsProtectedRoute';
-
 import MeetingRoom from './components/meeting/MeetingRoom';
 import AdminProjectDetail from './components/admin/AdminProjectDetail';
 
+import ToolsProtectedRoute from './components/admin/ToolsProtectedRoute';
+import { NotificationProvider } from './context/NotificationContext';
+
+// import SteamBigPictureSplash from './components/common/SteamBigPictureSplash';
+
+import './styles/globals.css';
 
 function App() {
   const location = useLocation();
@@ -47,6 +49,7 @@ function App() {
   const noLayoutRoutes = ['/login', '/register', '/forgot-password', '/complete-profile'];
   const hideLayout = noLayoutRoutes.includes(location.pathname);
 
+  // const [showSplash, setShowSplash] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
@@ -54,11 +57,13 @@ function App() {
   const [roleLoading, setRoleLoading] = useState(true);
   const [onlineUsers, setOnlineUsers] = useState([]);
 
+  // Toggle dark mode
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
     localStorage.setItem('darkMode', darkMode);
   }, [darkMode]);
 
+  // Fetch user role
   useEffect(() => {
     const fetchRole = async () => {
       if (user) {
@@ -74,46 +79,52 @@ function App() {
     fetchRole();
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
+  // Track online users
+  // useEffect(() => {
+  //   if (!user) return;
 
-    const updateLastSeen = async () => {
-      await supabase.from('presence').upsert({
-        user_id: user.id,
-        username: user.email,
-        last_seen: new Date().toISOString(),
-      });
-    };
+  //   const updateLastSeen = async () => {
+  //     await supabase.from('presence').upsert({
+  //       user_id: user.id,
+  //       username: user.email,
+  //       last_seen: new Date().toISOString(),
+  //     });
+  //   };
 
-    updateLastSeen();
-    const heartbeat = setInterval(updateLastSeen, 15000);
+  //   updateLastSeen();
+  //   const heartbeat = setInterval(updateLastSeen, 15000);
 
-    const fetchOnlineUsers = async () => {
-      const THRESHOLD = 30000;
-      const { data } = await supabase.from('presence').select('*');
-      const now = Date.now();
-      const filtered = data.filter(u => new Date(u.last_seen).getTime() > now - THRESHOLD);
-      setOnlineUsers(filtered);
-    };
+  //   // const fetchOnlineUsers = async () => {
+  //   //   const THRESHOLD = 30000;
+  //   //   const { data } = await supabase.from('presence').select('*');
+  //   //   const now = Date.now();
+  //   //   const filtered = data.filter(u => new Date(u.last_seen).getTime() > now - THRESHOLD);
+  //   //   setOnlineUsers(filtered);
+  //   // };
 
-    fetchOnlineUsers();
-    const channel = supabase
-      .channel('presence-watch')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'presence' }, fetchOnlineUsers)
-      .subscribe();
+  //   // fetchOnlineUsers();
+  //   // const channel = supabase
+  //   //   .channel('presence-watch')
+  //   //   .on('postgres_changes', { event: '*', schema: 'public', table: 'presence' }, fetchOnlineUsers)
+  //   //   .subscribe();
 
-    return () => {
-      clearInterval(heartbeat);
-      supabase.removeChannel(channel);
-    };
-  }, [user]);
+  //   return () => {
+  //     clearInterval(heartbeat);
+  //     supabase.removeChannel(channel);
+  //   };
+  // }, [user]);
 
   const handleSidebarToggle = () => setIsSidebarOpen(!isSidebarOpen);
   const handleCollapseToggle = () => setCollapsed(!collapsed);
 
-  if (loading || (user && roleLoading)) {
-    return <div className="h-screen flex items-center justify-center text-gray-700 dark:text-white">Loading...</div>;
-  }
+  // Show loading or splash
+  // if (loading || (user && roleLoading)) {
+  //   return <div className="h-screen flex items-center justify-center text-gray-700 dark:text-white">Loading...</div>;
+  // }
+
+  // if (showSplash) {
+  //   return <SteamBigPictureSplash onFinish={() => setShowSplash(false)} />;
+  // }
 
   return (
     <NotificationProvider>
@@ -167,7 +178,13 @@ function App() {
               <Route path="/admin/approvals" element={<ProtectedRoute requireAdmin={true}><Approvals /></ProtectedRoute>} />
               <Route path="/admin/events" element={<ProtectedRoute requireAdmin={true}><Events /></ProtectedRoute>} />
               <Route path="/admin/news" element={<ProtectedRoute requireAdmin={true}><News /></ProtectedRoute>} />
-              <Route path="/admin/liveuserslist" element={<ProtectedRoute requireAdmin={true}><ToolsProtectedRoute><LiveUsersList onlineUsers={onlineUsers} /></ToolsProtectedRoute></ProtectedRoute>} />
+              <Route path="/admin/liveuserslist" element={
+                <ProtectedRoute requireAdmin={true}>
+                  <ToolsProtectedRoute>
+                    <LiveUsersList onlineUsers={onlineUsers} />
+                  </ToolsProtectedRoute>
+                </ProtectedRoute>
+              } />
 
               <Route path="/meeting/:roomId" element={<ProtectedRoute><MeetingRoom /></ProtectedRoute>} />
 

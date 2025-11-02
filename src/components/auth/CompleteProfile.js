@@ -16,7 +16,7 @@ export default function CompleteProfile() {
     formState: { errors, isSubmitting },
   } = useForm();
 
-  // Fetch user
+  // ✅ Fetch user
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) navigate("/login");
@@ -24,22 +24,13 @@ export default function CompleteProfile() {
     });
   }, [navigate]);
 
-  // Fetch avatar file names from storage
+  // ✅ Fetch avatars from storage
   useEffect(() => {
     const fetchAvatars = async () => {
-      const { data, error } = await supabase.storage
-        .from("avatars")
-        .list("", { limit: 30 });
-
-      if (error) {
-        console.error("Error fetching avatars", error);
-        return;
-      }
-
-      const avatarPaths = data.map((file) => file.name);
-      setAvatars(avatarPaths);
+      const { data, error } = await supabase.storage.from("avatars").list("", { limit: 30 });
+      if (error) return console.error("Error fetching avatars", error);
+      setAvatars(data.map((file) => file.name));
     };
-
     fetchAvatars();
   }, []);
 
@@ -61,6 +52,7 @@ export default function CompleteProfile() {
       age: formData.age ? parseInt(formData.age, 10) : null,
       address: formData.address,
       avatar_url: selectedAvatar || null,
+      is_profile_complete: true, // ✅ mark as complete
     });
 
     if (error) {
@@ -80,7 +72,9 @@ export default function CompleteProfile() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Full Name
+            </label>
             <input
               {...register("name", { required: true })}
               className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
@@ -89,7 +83,9 @@ export default function CompleteProfile() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Registration Number</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Registration Number
+            </label>
             <input
               {...register("reg_no", { required: true })}
               className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
@@ -98,7 +94,9 @@ export default function CompleteProfile() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Mobile Number</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Mobile Number
+            </label>
             <input
               {...register("mobile_no", { required: true })}
               className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
@@ -107,7 +105,9 @@ export default function CompleteProfile() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Emergency Contact</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Emergency Contact
+            </label>
             <input
               {...register("emergency_contact")}
               className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
@@ -115,7 +115,9 @@ export default function CompleteProfile() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Blood Type</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Blood Type
+            </label>
             <input
               {...register("blood_type")}
               className="w-full border p-2 rounded dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
@@ -146,7 +148,9 @@ export default function CompleteProfile() {
 
           {/* Avatar Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Choose an Avatar</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Choose an Avatar
+            </label>
             <div className="grid grid-cols-4 gap-4">
               {avatars.map((path, index) => {
                 const publicUrl = getAvatarPublicUrl(path);

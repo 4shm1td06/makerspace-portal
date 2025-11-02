@@ -15,7 +15,6 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
     const checkProfileAndRole = async () => {
       if (!user) return;
 
-      console.log("🔍 Checking profile for user:", user.id);
       setCheckingProfile(true);
 
       const { data, error } = await supabase
@@ -25,20 +24,15 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
         .single();
 
       if (error) {
-        console.error("❌ Failed to fetch profile:", error);
         setCheckingProfile(false);
         return;
       }
-
-      console.log("✅ Fetched profile data:", data);
 
       const isIncomplete =
         !data?.mobile_no || !data?.name || !data?.reg_no;
       setIsProfileIncomplete(isIncomplete);
 
       const role = data?.role?.toLowerCase();
-      console.log("👑 Role from profile:", role);
-
       setIsAdmin(role === 'admin');
       setCheckingProfile(false);
     };
@@ -57,7 +51,6 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
   }
 
   if (requireAdmin && !isAdmin) {
-    console.warn("🚫 Not an admin, redirecting.");
     return <Navigate to="/" replace />;
   }
 

@@ -41,18 +41,42 @@ export default function Login() {
       await toast.promise(
         (async () => {
           await new Promise((res) => setTimeout(res, 1000));
+
+          // 1️⃣ Sign in
           const { error } = await authService.signIn(email, password);
           if (error) throw error;
+
+          // 2️⃣ Get user
           const {
             data: { user },
           } = await supabase.auth.getUser();
+          if (!user) throw new Error("User not found.");
+
+          // 3️⃣ Fetch profile
           const { data: profile, error: profileError } = await supabase
-            .from("profile")
-            .select("full_name")
+            .from("profiles") // ✅ Ensure table name is plural
+            .select("*")
             .eq("id", user.id)
             .single();
 
-          if (profileError) return `Welcome back, ${email.split("@")[0]}!`;
+          // 4️⃣ No profile → go to Complete Profile
+          if (profileError || !profile) {
+            navigate("/complete-profile");
+            return `Welcome ${email.split("@")[0]}! Please complete your profile.`;
+          }
+
+          // 5️⃣ Check completeness (use boolean or field-based)
+          const isProfileComplete =
+            profile.is_profile_complete ||
+            (profile.full_name && profile.role && profile.roll_number);
+
+          if (!isProfileComplete) {
+            navigate("/complete-profile");
+            return `Welcome ${profile.full_name || email.split("@")[0]}! Please complete your profile.`;
+          }
+
+          // 6️⃣ Everything fine → dashboard
+          navigate("/dashboard");
           return `Welcome back, ${profile.full_name || email.split("@")[0]}!`;
         })(),
         {
@@ -66,7 +90,6 @@ export default function Login() {
           },
         }
       );
-      navigate("/dashboard");
     } catch (err) {
       console.error("Unexpected error:", err);
     } finally {
@@ -77,7 +100,7 @@ export default function Login() {
   return (
     <div className={darkMode ? "dark" : ""}>
       <div className="min-h-screen flex bg-white dark:bg-gray-900">
-        {/* Left Side with BG */}
+        {/* Left side */}
         <div
           className="hidden lg:flex flex-col justify-center items-center w-1/2 bg-cover bg-center transition-all duration-1000"
           style={{ backgroundImage: `url(${backgroundImages[bgIndex]})` }}
@@ -88,16 +111,15 @@ export default function Login() {
           </h1>
         </div>
 
-        {/* Right Side */}
+        {/* Right side */}
         <div className="flex flex-col justify-center w-full lg:w-1/2 px-6 py-12 relative">
-          {/* Dark Mode Toggle */}
+          {/* Dark mode toggle */}
           <button
             onClick={() => setDarkMode((prev) => !prev)}
             className="absolute top-4 right-4 text-sm text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded"
           >
             {darkMode ? "☀️ Light" : "🌙 Dark"}
           </button>
-
           <div className="w-full max-w-md mx-auto">
             <h2 className="text-3xl font-semibold mb-6 text-center text-gray-800 dark:text-white">Login</h2>
 
@@ -113,9 +135,7 @@ export default function Login() {
                   {...register("email")}
                   className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
                 />
-                {errors.email && (
-                  <p className="text-red-600 text-sm mt-1">{errors.email.message}</p>
-                )}
+                {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email.message}</p>}
               </div>
 
               {/* Password */}
@@ -138,12 +158,10 @@ export default function Login() {
                     {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
-                {errors.password && (
-                  <p className="text-red-600 text-sm mt-1">{errors.password.message}</p>
-                )}
+                {errors.password && <p className="text-red-600 text-sm mt-1">{errors.password.message}</p>}
               </div>
 
-              {/* Forgot Password */}
+              {/* Forgot password */}
               <div className="text-right text-sm">
                 <Link to="/forgot-password" className="text-primary-600 hover:underline">
                   Forgot password?
@@ -160,7 +178,11 @@ export default function Login() {
                   <>
                     <svg className="animate-spin h-5 w-5 mr-2 text-white" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3.5-3.5L12 0v4a8 8 0 00-8 8z" />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4l3.5-3.5L12 0v4a8 8 0 00-8 8z"
+                      />
                     </svg>
                     Logging in...
                   </>
@@ -170,27 +192,27 @@ export default function Login() {
               </button>
             </form>
 
-            {/* T&C and Register */}
+            {/* Register + T&C */}
             <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
               By logging in, you accept the{" "}
               <button onClick={() => setShowTerms(true)} className="text-primary-600 hover:underline">
                 T&C
               </button>{" "}
-              laid down by the ERP team.<br />
+              laid down by the ERP team.
+              <br />
               Don’t have an account?{" "}
               <Link to="/register" className="text-primary-600 hover:underline font-medium">
                 Register Now
               </Link>
             </div>
 
-            {/* Footer */}
             <p className="mt-4 text-xs text-center text-gray-500 dark:text-gray-400">
               Developed by MKS Web Dev Team | Project Lead: Ashmit Sharma
             </p>
           </div>
         </div>
 
-        {/* Terms Modal */}
+        {/* Terms modal */}
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-lg w-full shadow-lg relative overflow-hidden">
@@ -199,11 +221,11 @@ export default function Login() {
                 <p>By using the MakerSpace Portal, you agree to abide by the policies set forth by the ERP team:</p>
                 <ul className="list-disc pl-5 space-y-2">
                   <li>Use all tools and materials responsibly and ethically.</li>
-                  <li>Follow all safety protocols and standard operating procedures.</li>
+                  <li>Follow all safety protocols and SOPs.</li>
                   <li>Log all equipment usage accurately in the system.</li>
-                  <li>Ensure your project documentation is kept up to date.</li>
-                  <li>Respect all fellow makers and staff within the space.</li>
-                  <li>Violations may result in suspension or permanent banning.</li>
+                  <li>Keep project documentation updated.</li>
+                  <li>Respect all fellow makers and staff.</li>
+                  <li>Violations may result in suspension or banning.</li>
                   <li>Your activity may be logged and audited for compliance.</li>
                 </ul>
               </div>
