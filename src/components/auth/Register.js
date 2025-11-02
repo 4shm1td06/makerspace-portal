@@ -161,4 +161,4 @@ export default function Register() {
       </div>
     </div>
   );
-// {end of Register component}
+}
