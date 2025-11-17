@@ -175,6 +175,7 @@ const MemberInfoCard = () => {
           <div><span className="font-medium">Blood Type:</span> {profile.blood_type}</div>
           <div><span className="font-medium">Registration No:</span> {profile.reg_no || 'N/A'}</div>
           <div><span className="font-medium">Role:</span> {profile.role || 'Member'}</div>
+          <div><span className="font-medium">Department</span>{profile.department || 'Common'}</div>
           <div><span className="font-medium">Created At:</span> {formatDate(user.created_at)}</div>
           <div><span className="font-medium">Last Login:</span> {formatDate(user.last_sign_in_at)}</div>
         </div>
