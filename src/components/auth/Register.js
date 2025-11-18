@@ -22,6 +22,7 @@ export default function Register() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [approvalPending, setApprovalPending] = useState(false);
   const [enteredOtp, setEnteredOtp] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,14 +37,18 @@ export default function Register() {
   const onSubmit = async ({ email, password }) => {
     setLoading(true);
     try {
-      const res = await axios.post("https://mks-smtp.vercel.app/api/request-registration", {
-        email,
-        password,
-      });
+      const res = await axios.post(
+        "https://mks-smtp.vercel.app/api/request-registration",
+        { email, password }
+      );
 
       if (res.data.requiresApproval) {
         toast("Approval request sent to ERP Admin.");
-      } else if (res.data.otpSent) {
+        setApprovalPending(true);
+        return;
+      }
+
+      if (res.data.otpSent) {
         toast.success("OTP sent to your JECRC email!");
         setOtpSent(true);
         setEmail(email);
@@ -59,7 +64,7 @@ export default function Register() {
     }
   };
 
-  // --- Step 2: Verify OTP via Backend ---
+  // --- Step 2: Verify OTP ---
   const verifyOtp = async () => {
     if (!enteredOtp) return toast.error("Please enter the OTP");
 
@@ -92,53 +97,27 @@ export default function Register() {
           Create Account
         </h2>
 
-        {!otpSent ? (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label className="block text-gray-700 dark:text-gray-300">Email</label>
-              <input
-                type="email"
-                {...register("email")}
-                className="w-full border px-3 py-2 rounded dark:bg-gray-800 dark:text-white"
-              />
-              {errors.email && <p className="text-red-600 text-sm">{errors.email.message}</p>}
-            </div>
+        {/* === APPROVAL PENDING SCREEN === */}
+        {approvalPending && (
+          <div className="flex flex-col items-center justify-center py-10 text-center space-y-6">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
+              Request Under Review
+            </h3>
 
-            {/* Password */}
-            <div>
-              <label className="block text-gray-700 dark:text-gray-300">Password</label>
-              <input
-                type="password"
-                {...register("password")}
-                className="w-full border px-3 py-2 rounded dark:bg-gray-800 dark:text-white"
-              />
-              {errors.password && <p className="text-red-600 text-sm">{errors.password.message}</p>}
-            </div>
+            <p className="text-gray-600 dark:text-gray-300 max-w-sm">
+              Your registration request has been sent to the Admin.
+              <br />
+              Please wait while your request is reviewed.
+              <br />
+              You will receive an email once the account is approved.
+            </p>
 
-            {/* Confirm Password */}
-            <div>
-              <label className="block text-gray-700 dark:text-gray-300">Confirm Password</label>
-              <input
-                type="password"
-                {...register("confirmPassword")}
-                className="w-full border px-3 py-2 rounded dark:bg-gray-800 dark:text-white"
-              />
-              {errors.confirmPassword && (
-                <p className="text-red-600 text-sm">{errors.confirmPassword.message}</p>
-              )}
-            </div>
+            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition disabled:opacity-60"
-            >
-              {loading ? "Processing..." : "Register"}
-            </button>
-          </form>
-        ) : (
-          // --- OTP Verification ---
+        {/* === OTP SCREEN === */}
+        {!approvalPending && otpSent ? (
           <div className="space-y-4">
             <p className="text-center text-gray-700 dark:text-gray-300">
               Enter the OTP sent to your email
@@ -157,9 +136,64 @@ export default function Register() {
               {loading ? "Verifying..." : "Verify OTP"}
             </button>
           </div>
+        ) : null}
+
+        {/* === REGISTRATION FORM === */}
+        {!otpSent && !approvalPending && (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Email */}
+            <div>
+              <label className="block text-gray-700 dark:text-gray-300">Email</label>
+              <input
+                type="email"
+                {...register("email")}
+                className="w-full border px-3 py-2 rounded dark:bg-gray-800 dark:text-white"
+              />
+              {errors.email && (
+                <p className="text-red-600 text-sm">{errors.email.message}</p>
+              )}
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-gray-700 dark:text-gray-300">Password</label>
+              <input
+                type="password"
+                {...register("password")}
+                className="w-full border px-3 py-2 rounded dark:bg-gray-800 dark:text-white"
+              />
+              {errors.password && (
+                <p className="text-red-600 text-sm">{errors.password.message}</p>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label className="block text-gray-700 dark:text-gray-300">
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                {...register("confirmPassword")}
+                className="w-full border px-3 py-2 rounded dark:bg-gray-800 dark:text-white"
+              />
+              {errors.confirmPassword && (
+                <p className="text-red-600 text-sm">
+                  {errors.confirmPassword.message}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition disabled:opacity-60"
+            >
+              {loading ? "Processing..." : "Register"}
+            </button>
+          </form>
         )}
       </div>
     </div>
   );
-
 }
